@@ -17,7 +17,7 @@ export default async function EmployeeDetailPage({ params }: { params: { id: str
     .single();
   if (myProfile?.role !== 'manager') redirect('/dashboard');
 
-  cconst { data: employee } = await supabase
+  const { data: employee } = await supabase
     .from('profiles')
     .select('id, first_name, last_name, full_name, email')
     .eq('id', params.id)
