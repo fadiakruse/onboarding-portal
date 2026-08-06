@@ -24,7 +24,7 @@ export default function AppHeader({ practiceName, isManager }: AppHeaderProps) {
       <div className="mx-auto flex max-w-4xl items-center justify-between px-4 py-3">
         <Link href="/dashboard" className="flex items-center gap-3">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo.svg" alt={practiceName} className="h-9 w-auto" />
+          <img src="/logo.jpg" alt={practiceName} className="h-9 w-auto" />
         </Link>
         <div className="flex items-center gap-4 text-xs">
           {isManager && (
