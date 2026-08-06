@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server';
 
-// routingnumbers.info has been shut down (the domain is now parked/for sale),
-// so this now uses API Ninjas' routing number endpoint instead. Sign up for a
-// free key at https://api.api-ninjas.com/ and set API_NINJAS_KEY in Vercel's
-// environment variables. The free tier covers typical onboarding volume.
+// Uses bankrouting.io — a genuinely free, no-key, no-auth API built on the
+// Federal Reserve's routing number directory. Replaces both the old dead
+// routingnumbers.info domain and API Ninjas (whose bank_name field turned
+// out to be premium-only). Rate limit: 100 req/hour/IP, well above onboarding
+// volume. See https://bankrouting.io/ for details.
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const rn = (searchParams.get('rn') || '').replace(/\D/g, '');
@@ -12,21 +13,21 @@ export async function GET(request: Request) {
     return NextResponse.json({ bankName: null });
   }
 
-  const apiKey = process.env.API_NINJAS_KEY;
-  if (!apiKey) {
-    console.error('API_NINJAS_KEY is not set; routing lookup is disabled.');
-    return NextResponse.json({ bankName: null });
-  }
-
   try {
-    const res = await fetch(`https://api.api-ninjas.com/v1/routingnumber?routing_number=${rn}`, {
-      headers: { 'X-Api-Key': apiKey },
-    });
+    const res = await fetch(`https://bankrouting.io/api/v1/aba/${rn}`);
+
     if (!res.ok) {
+      // 400 = invalid checksum, 404 = valid number but bank not in database.
+      // Either way, no bank name available — fail gracefully, no crash.
       return NextResponse.json({ bankName: null });
     }
-    const data = (await res.json()) as Array<{ bank?: string }>;
-    const bankName = Array.isArray(data) && data.length > 0 ? data[0].bank ?? null : null;
+
+    const data = (await res.json()) as {
+      status?: string;
+      data?: { bank_name?: string };
+    };
+
+    const bankName = data.status === 'success' ? data.data?.bank_name ?? null : null;
     return NextResponse.json({ bankName });
   } catch (err) {
     console.error('Routing lookup failed', err);
