@@ -14,6 +14,7 @@ export interface FormField {
   showIf?: { field: string; equals: string };
   confirmOf?: string;
   accept?: string;
+  mask?: boolean;
   triggersBankLookup?: boolean;
   defaultToday?: boolean;
   defaultValue?: string;
