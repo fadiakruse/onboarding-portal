@@ -105,12 +105,6 @@ export default async function AdminPage() {
                       >
                         View details →
                       </Link>
-                      <Link
-                        href="/admin/files"
-                        className="inline-flex items-center gap-2 text-sm font-medium text-blue-600 hover:underline"
-                        >
-                        📁 View Employee Files
-                      </Link>
                       <DeleteEmployeeButton employeeId={emp.id} employeeLabel={displayName} />
                     </div>
                   </td>

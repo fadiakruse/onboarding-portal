@@ -16,16 +16,19 @@ function formatSize(bytes: number | null) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+const ROOT_FOLDER = 'Employee Files';
+
 export default function EmployeeFilesPage() {
-  const [path, setPath] = useState('');
+  const [path, setPath] = useState(ROOT_FOLDER);  
   const [items, setItems] = useState<StorageItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const segments = path ? path.split('/') : [];
-
+  const relativePath = path.startsWith(ROOT_FOLDER) ? path.slice(ROOT_FOLDER.length).replace(/^\//, '') : path;
+  const segments = relativePath ? relativePath.split('/') : [];
+  
   const load = useCallback(async (targetPath: string) => {
     setLoading(true);
     setError(null);
@@ -47,9 +50,9 @@ export default function EmployeeFilesPage() {
   }, [path, load]);
 
   const openFolder = (name: string) => setPath(path ? `${path}/${name}` : name);
-  const goToBreadcrumb = (index: number) => setPath(segments.slice(0, index + 1).join('/'));
-  const goToRoot = () => setPath('');
-
+  const goToBreadcrumb = (index: number) => setPath(`${ROOT_FOLDER}/${segments.slice(0, index + 1).join('/')}`);
+  const goToRoot = () => setPath(ROOT_FOLDER);
+  
   const downloadFile = async (name: string) => {
     const fullPath = path ? `${path}/${name}` : name;
     const res = await fetch(`/api/admin/storage/download?path=${encodeURIComponent(fullPath)}`);
@@ -92,8 +95,9 @@ export default function EmployeeFilesPage() {
       </div>
 
       <nav className="flex items-center flex-wrap gap-1 text-sm mb-4 text-gray-600">
-        <button onClick={goToRoot} className="hover:underline text-blue-600">Root</button>
-        {segments.map((seg, i) => (
+      <button onClick={goToRoot} className="hover:underline text-blue-600">All Employees</button>        
+      
+      {segments.map((seg, i) => (
           <span key={i} className="flex items-center gap-1">
             <span>/</span>
             <button onClick={() => goToBreadcrumb(i)} className="hover:underline text-blue-600">{seg}</button>

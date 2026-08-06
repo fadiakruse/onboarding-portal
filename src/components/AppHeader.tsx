@@ -35,7 +35,9 @@ export default function AppHeader({ practiceName, isManager }: AppHeaderProps) {
               <Link href="/admin" className="text-gray-500 hover:text-gray-800">
                 Manager View
               </Link>
-            </>
+              <Link href="/admin/files" className="text-gray-500 hover:text-gray-800">
+                View Employee Files
+              </Link>            </>
           )}
           <button onClick={handleSignOut} className="text-gray-500 hover:text-gray-800">
             Sign out
