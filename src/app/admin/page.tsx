@@ -3,6 +3,8 @@ import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
 import { TOTAL_FORMS } from '@/lib/forms-config';
 import DeleteEmployeeButton from '@/components/DeleteEmployeeButton';
+import ResendLinkButton from '@/components/ResendLinkButton';
+import InviteEmployeeButton from '@/components/InviteEmployeeButton';
 
 export default async function AdminPage() {
   const supabase = createClient();
@@ -38,10 +40,15 @@ export default async function AdminPage() {
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-10">
-      <p className="text-sm text-gray-500">{practiceName}</p>
-      <h1 className="text-2xl font-semibold text-gray-900">Manager Dashboard</h1>
-      <p className="mt-1 text-sm text-gray-500">Onboarding progress for {employees?.length ?? 0} employees</p>
-
+      <div className="flex items-start justify-between">
+        <div>
+          <p className="text-sm text-gray-500">{practiceName}</p>
+          <h1 className="text-2xl font-semibold text-gray-900">Manager Dashboard</h1>
+          <p className="mt-1 text-sm text-gray-500">Onboarding progress for {employees?.length ?? 0} employees</p>
+        </div>
+        <InviteEmployeeButton />
+      </div>
+      
       <div className="mt-6 overflow-x-auto rounded-lg border border-gray-200 bg-white">
         <table className="min-w-full divide-y divide-gray-200 text-sm">
           <thead className="bg-gray-50">
@@ -105,6 +112,7 @@ export default async function AdminPage() {
                       >
                         View details →
                       </Link>
+                      <ResendLinkButton employeeId={emp.id} />
                       <DeleteEmployeeButton employeeId={emp.id} employeeLabel={displayName} />
                     </div>
                   </td>
