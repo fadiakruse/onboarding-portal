@@ -17,12 +17,15 @@ export default async function EmployeeDetailPage({ params }: { params: { id: str
     .single();
   if (myProfile?.role !== 'manager') redirect('/dashboard');
 
-  const { data: employee } = await supabase
+  cconst { data: employee } = await supabase
     .from('profiles')
-    .select('id, full_name, email')
+    .select('id, first_name, last_name, full_name, email')
     .eq('id', params.id)
     .single();
   if (!employee) notFound();
+
+  const employeeDisplayName =
+    [employee.first_name, employee.last_name].filter(Boolean).join(' ') || employee.full_name || employee.email;
 
   const { data: formRows } = await supabase
     .from('employee_forms')
@@ -49,7 +52,7 @@ export default async function EmployeeDetailPage({ params }: { params: { id: str
       </Link>
 
       <h1 className="mt-3 text-xl font-semibold text-gray-900">
-        {employee.full_name || employee.email}
+        {employeeDisplayName}
       </h1>
       <p className="text-sm text-gray-500">{employee.email}</p>
 

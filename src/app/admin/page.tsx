@@ -81,16 +81,24 @@ export default async function AdminPage() {
                       {displayName} {isSelf && <span className="text-xs font-normal text-gray-400">(You)</span>}
                     </td>
                     <td className="px-4 py-3 text-gray-600">{mgr.email}</td>
-                    <td className="px-4 py-3 text-right">
-                      {!isSelf && (
-                        <UpdateRoleButton
-                          employeeId={mgr.id}
-                          employeeLabel={displayName}
-                          newRole="employee"
-                          label="Remove manager access"
-                        />
-                      )}
-                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center justify-end gap-3">
+                        <Link
+                          href={`/admin/employee/${mgr.id}`}
+                          className="text-xs font-medium text-brand-600 hover:underline"
+                        >
+                          View details →
+                        </Link>
+                        {!isSelf && (
+                          <UpdateRoleButton
+                            employeeId={mgr.id}
+                            employeeLabel={displayName}
+                            newRole="employee"
+                            label="Remove manager access"
+                          />
+                        )}
+                      </div>
+                    </td>                  
                   </tr>
                 );
               })}
