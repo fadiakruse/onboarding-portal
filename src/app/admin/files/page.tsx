@@ -54,16 +54,26 @@ export default function EmployeeFilesPage() {
   const goToRoot = () => setPath(ROOT_FOLDER);
   
   const downloadFile = async (name: string) => {
+    // Open the tab synchronously, inside the click handler, so the browser
+    // treats it as user-initiated and doesn't block it. We fill in the real
+    // URL once it's ready.
+    const tab = window.open('', '_blank');
     const fullPath = path ? `${path}/${name}` : name;
     const res = await fetch(`/api/admin/storage/download?path=${encodeURIComponent(fullPath)}`);
     const data = await res.json();
     if (!res.ok) {
       setError(data.error || 'Failed to generate download link');
+      tab?.close();
       return;
     }
-    window.open(data.url, '_blank');
+    if (tab) {
+      tab.location.href = data.url;
+    } else {
+      // Popup was blocked anyway (e.g. browser setting) — fall back to same-tab navigation.
+      window.location.href = data.url;
+    }
   };
-
+  
   const handleUploadClick = () => fileInputRef.current?.click();
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {

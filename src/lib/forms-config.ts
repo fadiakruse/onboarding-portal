@@ -81,7 +81,7 @@ export const FORMS: FormConfig[] = [
       { id: 'routingNumberConfirm', label: 'Confirm Routing Number', type: 'confirmOf', confirmOf: 'routingNumber', required: true },
       { id: 'bankName', label: 'Name of Bank', type: 'text', required: true, helpText: 'Auto-filled from the routing number when recognized — double check it\u2019s correct.' },
       { id: 'accountNumber', label: 'Account Number', type: 'maskedConfirm', required: true },
-      { id: 'accountNumberConfirm', label: 'Confirm Account Number', type: 'confirmOf', confirmOf: 'accountNumber', required: true },
+      { id: 'accountNumberConfirm', label: 'Confirm Account Number', type: 'confirmOf', confirmOf: 'accountNumber', mask: true, required: true },
       { id: 'accountType', label: 'Type of Account', type: 'radio', options: ['Checking', 'Savings'], required: true },
       { id: 'checkImage', label: 'Upload Check Image (voided check)', type: 'fileUpload', accept: 'image/*,application/pdf', required: true },
     ], requiresSignature: true },

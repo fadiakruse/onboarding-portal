@@ -59,6 +59,24 @@ function MaskedConfirmField({ value, onChange }: { value: string; onChange: (v: 
   );
 }
 
+// Same masked-with-preview treatment as MaskedConfirmField above, but for
+// confirmOf fields, which also need the mismatch warning. Only used when the
+// field is explicitly flagged with `mask: true` in forms-config, so unrelated
+// confirmOf fields elsewhere (if any) keep their current plain-text behavior.
+function MaskedConfirmOfField({ value, onChange, mismatch }: { value: string; onChange: (v: string) => void; mismatch: boolean }) {
+  const [revealed, setRevealed] = useState(false);
+  return (
+    <div>
+      <div className="flex items-center gap-2">
+        <input type={revealed ? 'text' : 'password'} value={value || ''} onChange={(e) => onChange(e.target.value)}
+          className={`w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-1 ${mismatch ? 'border-red-400 focus:border-red-500 focus:ring-red-500' : 'border-gray-300 focus:border-brand-600 focus:ring-brand-600'}`} />
+        <button type="button" onClick={() => setRevealed((r) => !r)} className="whitespace-nowrap rounded-md border border-gray-300 px-2 py-2 text-xs text-gray-600 hover:bg-gray-50">{revealed ? 'Hide' : 'Preview'}</button>
+      </div>
+      {mismatch && <p className="mt-1 text-xs text-red-600">Doesn&rsquo;t match &mdash; please re-check.</p>}
+    </div>
+  );
+}
+
 function RoutingField({ value, onChange, onBankFound }: { value: string; onChange: (v: string) => void; onBankFound: (name: string) => void }) {
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   function handleInput(v: string) {
@@ -120,7 +138,10 @@ export default function FormRenderer({ fields, values, onChange }: FormRendererP
               )}
               {field.triggersBankLookup && <RoutingField value={values[field.id]} onChange={(v) => onChange(field.id, v)} onBankFound={(name) => onChange('bankName', name)} />}
               {field.type === 'maskedConfirm' && <MaskedConfirmField value={values[field.id]} onChange={(v) => onChange(field.id, v)} />}
-              {field.type === 'confirmOf' && (
+              {field.type === 'confirmOf' && field.mask && (
+                <MaskedConfirmOfField value={values[field.id]} onChange={(v) => onChange(field.id, v)} mismatch={!!confirmMismatch} />
+              )}
+              {field.type === 'confirmOf' && !field.mask && (
                 <div>
                   <input type="text" value={values[field.id] || ''} onChange={(e) => onChange(field.id, e.target.value)}
                     className={`w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-1 ${confirmMismatch ? 'border-red-400 focus:border-red-500 focus:ring-red-500' : 'border-gray-300 focus:border-brand-600 focus:ring-brand-600'}`} />

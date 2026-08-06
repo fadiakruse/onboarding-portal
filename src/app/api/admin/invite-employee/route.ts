@@ -16,10 +16,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Only managers can do this.' }, { status: 403 });
   }
 
-  const { firstName, lastName, email } = (await request.json()) as {
+  const { firstName, lastName, email, asManager } = (await request.json()) as {
     firstName?: string;
     lastName?: string;
     email?: string;
+    asManager?: boolean;
   };
 
   if (!firstName || !lastName || !email) {
@@ -31,8 +32,6 @@ export async function POST(request: Request) {
 
   const admin = createAdminClient();
 
-  // Check whether this email is already registered before attempting to
-  // create a new auth user (createUser will error, but we want a clearer message).
   const { data: existingProfile } = await admin
     .from('profiles')
     .select('id')
@@ -41,7 +40,7 @@ export async function POST(request: Request) {
 
   if (existingProfile) {
     return NextResponse.json(
-      { error: 'This employee already exists. Use "Resend link" instead of creating a new invite.' },
+      { error: 'This person already exists. Use "Resend link" or promote/demote their role instead.' },
       { status: 409 }
     );
   }
@@ -56,20 +55,25 @@ export async function POST(request: Request) {
 
   if (createError || !created?.user) {
     return NextResponse.json(
-      { error: `Failed to create employee account: ${createError?.message || 'Unknown error'}` },
+      { error: `Failed to create account: ${createError?.message || 'Unknown error'}` },
       { status: 500 }
     );
   }
 
-  // The trigger only sets full_name, so fill in first/last name explicitly.
+  // The trigger only sets full_name and defaults role to 'employee', so fill in
+  // first/last name here, and upgrade to manager if requested.
   const { error: updateError } = await admin
     .from('profiles')
-    .update({ first_name: firstName, last_name: lastName })
+    .update({
+      first_name: firstName,
+      last_name: lastName,
+      ...(asManager ? { role: 'manager' } : {}),
+    })
     .eq('id', created.user.id);
 
   if (updateError) {
     return NextResponse.json(
-      { error: `Employee created, but failed to save name details: ${updateError.message}` },
+      { error: `Account created, but failed to save details: ${updateError.message}` },
       { status: 500 }
     );
   }
@@ -86,7 +90,7 @@ export async function POST(request: Request) {
   if (otpError) {
     console.error('Invite email send failed', otpError);
     return NextResponse.json(
-      { error: `Employee created, but the invite email failed to send: ${otpError.message}` },
+      { error: `Account created, but the invite email failed to send: ${otpError.message}` },
       { status: 500 }
     );
   }

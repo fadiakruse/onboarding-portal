@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
   const supabase = adminStorageClient();
   const { data, error } = await supabase.storage
     .from('new-hire-forms')
-    .createSignedUrl(path, 60);
+    .createSignedUrl(path, 300); // 5 minutes
 
   if (error || !data) {
     return NextResponse.json({ error: error?.message || 'Failed to sign URL' }, { status: 500 });

@@ -11,12 +11,14 @@ export default function InviteEmployeeButton() {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
+  const [asManager, setAsManager] = useState(false);
 
   function resetAndClose() {
     setOpen(false);
     setFirstName('');
     setLastName('');
     setEmail('');
+    setAsManager(false);
     setError('');
   }
 
@@ -27,11 +29,11 @@ export default function InviteEmployeeButton() {
       const res = await fetch('/api/admin/invite-employee', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ firstName, lastName, email }),
+        body: JSON.stringify({ firstName, lastName, email, asManager }),
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) {
-        throw new Error(body.error || 'Could not invite this employee.');
+        throw new Error(body.error || 'Could not send this invite.');
       }
       resetAndClose();
       router.refresh();
@@ -54,7 +56,7 @@ export default function InviteEmployeeButton() {
       {open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
           <div className="w-full max-w-sm rounded-lg bg-white p-5 shadow-xl">
-            <h2 className="text-sm font-semibold text-gray-900">Invite a new employee</h2>
+            <h2 className="text-sm font-semibold text-gray-900">Invite a new person</h2>
             <p className="mt-1 text-xs text-gray-500">
               This creates their account and immediately emails them a login link.
             </p>
@@ -86,6 +88,21 @@ export default function InviteEmployeeButton() {
                 disabled={sending}
                 className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm disabled:opacity-60"
               />
+              <label className="flex items-center gap-2 text-xs text-gray-600">
+                <input
+                  type="checkbox"
+                  checked={asManager}
+                  onChange={(e) => setAsManager(e.target.checked)}
+                  disabled={sending}
+                />
+                Give this person manager (administrator) access
+              </label>
+              {asManager && (
+                <p className="text-xs text-amber-600">
+                  Managers can view all employee onboarding data, delete accounts, and manage other
+                  administrators.
+                </p>
+              )}
             </div>
 
             {error && <p className="mt-2 text-xs text-red-600">{error}</p>}
