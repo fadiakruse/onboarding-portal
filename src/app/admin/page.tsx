@@ -1,288 +1,213 @@
-'use client';
+import { redirect } from 'next/navigation';
+import Link from 'next/link';
+import { createClient } from '@/lib/supabase/server';
+import { TOTAL_FORMS } from '@/lib/forms-config';
+import DeleteEmployeeButton from '@/components/DeleteEmployeeButton';
+import ResendLinkButton from '@/components/ResendLinkButton';
+import InviteEmployeeButton from '@/components/InviteEmployeeButton';
+import UpdateRoleButton from '@/components/UpdateRoleButton';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+export default async function AdminPage() {
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect('/login');
 
-interface StorageItem {
-  name: string;
-  isFolder: boolean;
-  size: number | null;
-  updatedAt: string | null;
-}
+  const { data: myProfile } = await supabase.from('profiles').select('role').eq('id', user.id).single();
+  if (myProfile?.role !== 'manager') {
+    redirect('/dashboard');
+  }
 
-function formatSize(bytes: number | null) {
-  if (bytes === null) return '';
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
+  const { data: employees } = await supabase
+    .from('profiles')
+    .select('id, first_name, last_name, full_name, email, created_at')
+    .eq('role', 'employee')
+    .order('created_at', { ascending: false });
 
-// Folders first, then files, both alphabetical (case-insensitive) within
-// their group. Applied on the client so display order is guaranteed
-// regardless of what the storage API happens to return.
-function sortItems(items: StorageItem[]): StorageItem[] {
-  return [...items].sort((a, b) => {
-    if (a.isFolder !== b.isFolder) return a.isFolder ? -1 : 1;
-    return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
-  });
-}
+  const { data: managers } = await supabase
+    .from('profiles')
+    .select('id, first_name, last_name, full_name, email, created_at')
+    .eq('role', 'manager')
+    .order('created_at', { ascending: false });
 
-const ROOT_FOLDER = 'Employee Files';
+  const { data: allForms } = await supabase.from('employee_forms').select('employee_id, status');
+  const { data: inviteLogRows } = await supabase.from('invite_log').select('email, first_sent_at');
 
-export default function EmployeeFilesPage() {
-  const [path, setPath] = useState(ROOT_FOLDER);  
-  const [items, setItems] = useState<StorageItem[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [uploading, setUploading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [creatingFolder, setCreatingFolder] = useState(false);
-  const [newFolderOpen, setNewFolderOpen] = useState(false);
-  const [newFolderName, setNewFolderName] = useState('');
-  const [zippingFolder, setZippingFolder] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const inviteByEmail = new Map((inviteLogRows ?? []).map((r) => [r.email.toLowerCase(), r.first_sent_at]));
 
-  const relativePath = path.startsWith(ROOT_FOLDER) ? path.slice(ROOT_FOLDER.length).replace(/^\//, '') : path;
-  const segments = relativePath ? relativePath.split('/') : [];
-  
-  const load = useCallback(async (targetPath: string) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await fetch(`/api/admin/storage/list?path=${encodeURIComponent(targetPath)}`);
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to load folder');
-      setItems(sortItems(data.items));
-    } catch (err: any) {
-      setError(err.message);
-      setItems([]);
-    } finally {
-      setLoading(false);
+  const completionByEmployee = new Map<string, number>();
+  for (const row of allForms ?? []) {
+    if (row.status === 'completed') {
+      completionByEmployee.set(row.employee_id, (completionByEmployee.get(row.employee_id) || 0) + 1);
     }
-  }, []);
+  }
 
-  useEffect(() => {
-    load(path);
-  }, [path, load]);
-
-  const openFolder = (name: string) => setPath(path ? `${path}/${name}` : name);
-  const goToBreadcrumb = (index: number) => setPath(`${ROOT_FOLDER}/${segments.slice(0, index + 1).join('/')}`);
-  const goToRoot = () => setPath(ROOT_FOLDER);
-
-  const openInNewTab = async (url: string, tab: Window | null) => {
-    if (tab) {
-      tab.location.href = url;
-    } else {
-      window.location.href = url;
-    }
-  };
-
-  const viewFile = async (name: string) => {
-    const tab = window.open('', '_blank');
-    const fullPath = path ? `${path}/${name}` : name;
-    const res = await fetch(`/api/admin/storage/download?path=${encodeURIComponent(fullPath)}`);
-    const data = await res.json();
-    if (!res.ok) {
-      setError(data.error || 'Failed to generate a view link');
-      tab?.close();
-      return;
-    }
-    openInNewTab(data.url, tab);
-  };
-
-  const downloadFile = async (name: string) => {
-    const tab = window.open('', '_blank');
-    const fullPath = path ? `${path}/${name}` : name;
-    const res = await fetch(`/api/admin/storage/download?path=${encodeURIComponent(fullPath)}&download=true`);
-    const data = await res.json();
-    if (!res.ok) {
-      setError(data.error || 'Failed to generate a download link');
-      tab?.close();
-      return;
-    }
-    openInNewTab(data.url, tab);
-  };
-
-  const downloadFolder = async (name: string) => {
-    const fullPath = path ? `${path}/${name}` : name;
-    setZippingFolder(name);
-    setError(null);
-    try {
-      // Zipping happens server-side and can take a moment for larger
-      // folders, so we navigate directly rather than pre-opening a blank
-      // tab — the browser's download prompt appears once the zip is ready.
-      window.location.href = `/api/admin/storage/download-zip?path=${encodeURIComponent(fullPath)}`;
-    } finally {
-      setZippingFolder(null);
-    }
-  };
-
-  const handleUploadClick = () => fileInputRef.current?.click();
-
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setUploading(true);
-    setError(null);
-    try {
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('path', path);
-      const res = await fetch('/api/admin/storage/upload', { method: 'POST', body: formData });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Upload failed');
-      await load(path);
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setUploading(false);
-      if (fileInputRef.current) fileInputRef.current.value = '';
-    }
-  };
-
-  const handleCreateFolder = async () => {
-    const trimmed = newFolderName.trim();
-    if (!trimmed) return;
-    setCreatingFolder(true);
-    setError(null);
-    try {
-      const res = await fetch('/api/admin/storage/create-folder', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ path, folderName: trimmed }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to create folder');
-      setNewFolderOpen(false);
-      setNewFolderName('');
-      await load(path);
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setCreatingFolder(false);
-    }
-  };
+  const practiceName = process.env.NEXT_PUBLIC_PRACTICE_NAME || 'Your Practice';
 
   return (
-    <div className="max-w-4xl mx-auto px-6 py-8">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-semibold text-gray-900">Employee Files</h1>
-        <a href="/admin" className="text-sm text-blue-600 hover:underline">&larr; Back to Dashboard</a>
+    <div className="mx-auto max-w-5xl px-4 py-10">
+      <div className="flex items-start justify-between">
+        <div>
+          <p className="text-sm text-gray-500">{practiceName}</p>
+          <h1 className="text-2xl font-semibold text-gray-900">Manager Dashboard</h1>
+          <p className="mt-1 text-sm text-gray-500">Onboarding progress for {employees?.length ?? 0} employees</p>
+        </div>
+        <InviteEmployeeButton />
       </div>
 
-      <nav className="flex items-center flex-wrap gap-1 text-sm mb-4 text-gray-600">
-      <button onClick={goToRoot} className="hover:underline text-blue-600">All Employees</button>        
-      
-      {segments.map((seg, i) => (
-          <span key={i} className="flex items-center gap-1">
-            <span>/</span>
-            <button onClick={() => goToBreadcrumb(i)} className="hover:underline text-blue-600">{seg}</button>
-          </span>
-        ))}
-      </nav>
-
-      <div className="flex items-center justify-between mb-3">
-        <span className="text-sm text-gray-500">
-          {loading ? 'Loading…' : `${items.length} item${items.length === 1 ? '' : 's'}`}
-        </span>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setNewFolderOpen(true)}
-            className="px-3 py-1.5 text-sm rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50"
-          >
-            New Folder
-          </button>
-          <input ref={fileInputRef} type="file" onChange={handleFileChange} className="hidden" />
-          <button
-            onClick={handleUploadClick}
-            disabled={uploading}
-            className="px-3 py-1.5 text-sm rounded-md bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
-          >
-            {uploading ? 'Uploading…' : 'Upload File Here'}
-          </button>
+      {/* Administrators */}
+      <div className="mt-8">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500">
+          Administrators ({managers?.length ?? 0})
+        </h2>
+        <div className="mt-2 overflow-x-auto rounded-lg border border-gray-200 bg-white">
+          <table className="min-w-full divide-y divide-gray-200 text-sm">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-4 py-3 text-left font-medium text-gray-500">Name</th>
+                <th className="px-4 py-3 text-left font-medium text-gray-500">Email</th>
+                <th className="px-4 py-3"></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {(managers ?? []).map((mgr) => {
+                const displayName =
+                  [mgr.first_name, mgr.last_name].filter(Boolean).join(' ') || mgr.full_name || '—';
+                const isSelf = mgr.id === user.id;
+                return (
+                  <tr key={mgr.id}>
+                    <td className="px-4 py-3 font-medium text-gray-900">
+                      {displayName} {isSelf && <span className="text-xs font-normal text-gray-400">(You)</span>}
+                    </td>
+                    <td className="px-4 py-3 text-gray-600">{mgr.email}</td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center justify-end gap-3">
+                        <Link
+                          href={`/admin/employee/${mgr.id}`}
+                          className="text-xs font-medium text-brand-600 hover:underline"
+                        >
+                          View details →
+                        </Link>
+                        {isSelf && (
+                          <Link href="/dashboard" className="text-xs font-medium text-brand-600 hover:underline">
+                            Update Forms
+                          </Link>
+                        )}
+                        {!isSelf && (
+                          <UpdateRoleButton
+                            employeeId={mgr.id}
+                            employeeLabel={displayName}
+                            newRole="employee"
+                            label="Remove manager access"
+                          />
+                        )}
+                      </div>
+                    </td>                  
+                  </tr>
+                );
+              })}
+              {(managers ?? []).length === 0 && (
+                <tr>
+                  <td colSpan={3} className="px-4 py-6 text-center text-sm text-gray-400">
+                    No administrators found.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
 
-      {error && (
-        <div className="mb-3 px-3 py-2 text-sm rounded-md bg-red-50 text-red-700 border border-red-200">
-          {error}
-        </div>
-      )}
+      {/* Employees */}
+      <div className="mt-8">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500">Employees</h2>
+        <div className="mt-2 overflow-x-auto rounded-lg border border-gray-200 bg-white">
+          <table className="min-w-full divide-y divide-gray-200 text-sm">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-4 py-3 text-left font-medium text-gray-500">Employee Name</th>
+                <th className="px-4 py-3 text-left font-medium text-gray-500">Email</th>
+                <th className="px-4 py-3 text-left font-medium text-gray-500">Date Sent</th>
+                <th className="px-4 py-3 text-left font-medium text-gray-500">Progress</th>
+                <th className="px-4 py-3 text-left font-medium text-gray-500">Status</th>
+                <th className="px-4 py-3"></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {(employees ?? []).map((emp) => {
+                const completed = completionByEmployee.get(emp.id) || 0;
+                const isDone = completed === TOTAL_FORMS;
+                const dateSent = emp.email ? inviteByEmail.get(emp.email.toLowerCase()) : null;
+                const displayName =
+                  [emp.first_name, emp.last_name].filter(Boolean).join(' ') || emp.full_name || '—';
 
-      {newFolderOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-          <div className="w-full max-w-sm rounded-lg bg-white p-5 shadow-xl">
-            <h2 className="text-sm font-semibold text-gray-900">New folder</h2>
-            <input
-              type="text"
-              autoFocus
-              value={newFolderName}
-              onChange={(e) => setNewFolderName(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleCreateFolder()}
-              placeholder="Folder name"
-              disabled={creatingFolder}
-              className="mt-3 w-full rounded border border-gray-300 px-2 py-1.5 text-sm disabled:opacity-60"
-            />
-            <div className="mt-4 flex justify-end gap-2">
-              <button
-                onClick={() => {
-                  setNewFolderOpen(false);
-                  setNewFolderName('');
-                  setError(null);
-                }}
-                disabled={creatingFolder}
-                className="rounded border border-gray-300 px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-50 disabled:opacity-60"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleCreateFolder}
-                disabled={creatingFolder || !newFolderName.trim()}
-                className="rounded bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-60"
-              >
-                {creatingFolder ? 'Creating…' : 'Create'}
-              </button>
-            </div>
-          </div>
+                return (
+                  <tr key={emp.id}>
+                    <td className="px-4 py-3 font-medium text-gray-900">{displayName}</td>
+                    <td className="px-4 py-3 text-gray-600">{emp.email}</td>
+                    <td className="px-4 py-3 text-gray-600">
+                      {dateSent ? new Date(dateSent).toLocaleDateString() : '—'}
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <div className="h-1.5 w-28 rounded-full bg-gray-200">
+                          <div
+                            className={`h-1.5 rounded-full ${isDone ? 'bg-green-600' : 'bg-brand-600'}`}
+                            style={{ width: `${(completed / TOTAL_FORMS) * 100}%` }}
+                          />
+                        </div>
+                        <span className="text-xs text-gray-500">
+                          {completed}/{TOTAL_FORMS}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      {isDone ? (
+                        <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">
+                          Complete
+                        </span>
+                      ) : completed === 0 ? (
+                        <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">
+                          Not started
+                        </span>
+                      ) : (
+                        <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
+                          In progress
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center justify-end gap-3">
+                        <Link
+                          href={`/admin/employee/${emp.id}`}
+                          className="text-xs font-medium text-brand-600 hover:underline"
+                        >
+                          View details →
+                        </Link>
+                        <ResendLinkButton employeeId={emp.id} />
+                        <DeleteEmployeeButton employeeId={emp.id} employeeLabel={displayName} />
+                        <UpdateRoleButton
+                          employeeId={emp.id}
+                          employeeLabel={displayName}
+                          newRole="manager"
+                          label="Make manager"
+                        />
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+              {(employees ?? []).length === 0 && (
+                <tr>
+                  <td colSpan={6} className="px-4 py-8 text-center text-sm text-gray-400">
+                    No employees have logged in yet.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
-      )}
-
-      <div className="border rounded-lg divide-y bg-white">
-        {!loading && items.length === 0 && (
-          <div className="px-4 py-6 text-sm text-gray-400 text-center">This folder is empty.</div>
-        )}
-        {items.map((item) => (
-          <div key={item.name} className="flex items-center justify-between px-4 py-2.5 hover:bg-gray-50">
-            <button
-              onClick={() => (item.isFolder ? openFolder(item.name) : undefined)}
-              className={`flex items-center gap-2 text-sm ${item.isFolder ? 'text-gray-800 font-medium cursor-pointer' : 'text-gray-700'}`}
-              disabled={!item.isFolder}
-            >
-              <span>{item.isFolder ? '📁' : '📄'}</span>
-              <span>{item.name}</span>
-            </button>
-            <div className="flex items-center gap-3 text-xs text-gray-400">
-              {!item.isFolder && <span>{formatSize(item.size)}</span>}
-              {!item.isFolder && (
-                <>
-                  <button onClick={() => viewFile(item.name)} className="text-blue-600 hover:underline text-xs font-medium">
-                    View
-                  </button>
-                  <button onClick={() => downloadFile(item.name)} className="text-blue-600 hover:underline text-xs font-medium">
-                    Download
-                  </button>
-                </>
-              )}
-              {item.isFolder && (
-                <button
-                  onClick={() => downloadFolder(item.name)}
-                  disabled={zippingFolder === item.name}
-                  className="text-blue-600 hover:underline text-xs font-medium disabled:opacity-50"
-                >
-                  {zippingFolder === item.name ? 'Zipping…' : 'Download'}
-                </button>
-              )}
-            </div>
-          </div>
-        ))}
       </div>
     </div>
   );
