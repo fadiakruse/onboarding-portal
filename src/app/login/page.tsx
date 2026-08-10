@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { createClient } from '@/lib/supabase/client';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -15,16 +14,25 @@ export default function LoginPage() {
     setStatus('sending');
     setErrorMsg('');
 
-    const supabase = createClient();
-    const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || '').replace(/\/+$/, '');
-    const { error } = await supabase.auth.signInWithOtp({ email, options: { emailRedirectTo: `${siteUrl}/auth/callback` } });
-
-    if (error) {
-      setStatus('error');
-      setErrorMsg(error.message);
-    } else {
+    try {
+      const res = await fetch('/api/request-login-link', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(body.error || 'Could not send the link.');
+      }
       setStatus('sent');
-      fetch('/api/track-invite', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email }) }).catch(() => {});
+      fetch('/api/track-invite', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      }).catch(() => {});
+    } catch (err: any) {
+      setStatus('error');
+      setErrorMsg(err.message);
     }
   }
 

@@ -15,6 +15,8 @@ interface FormWizardProps {
   alreadyCompleted: boolean;
   employeeName: string;
   profile: Record<AutofillKey, string>;
+  canEditCompleted?: boolean;
+  reviewComment?: string | null;
 }
 
 function renderTypedSignature(name: string): string {
@@ -29,7 +31,15 @@ function renderTypedSignature(name: string): string {
   return canvas.toDataURL('image/png');
 }
 
-export default function FormWizard({ form, existingAnswers, alreadyCompleted, employeeName, profile }: FormWizardProps) {
+export default function FormWizard({
+  form,
+  existingAnswers,
+  alreadyCompleted,
+  employeeName,
+  profile,
+  canEditCompleted = false,
+  reviewComment = null,
+}: FormWizardProps) {
   const router = useRouter();
 
   const profileDefaults = useMemo(() => {
@@ -50,6 +60,7 @@ export default function FormWizard({ form, existingAnswers, alreadyCompleted, em
   const todayDisplay = useRef(new Date().toLocaleDateString('en-US')).current;
 
   const showSummary = form.order !== 1 && (profile.fullName || profile.email || profile.phone);
+  const isLockedComplete = alreadyCompleted && !canEditCompleted;
 
   function handleChange(fieldId: string, value: any) {
     setValues((prev) => ({ ...prev, [fieldId]: value }));
@@ -64,7 +75,10 @@ export default function FormWizard({ form, existingAnswers, alreadyCompleted, em
         if (f.showIf && values[f.showIf.field] !== f.showIf.equals) return false;
         return f.required && !values[f.id] && values[f.id] !== false;
       });
-      if (requiredMissing) { setError('Please complete all required fields marked with *.'); return; }
+      if (requiredMissing) {
+        setError('Please complete all required fields marked with *.');
+        return;
+      }
     }
 
     const mismatchedConfirm = form.fields.find(
@@ -113,7 +127,7 @@ export default function FormWizard({ form, existingAnswers, alreadyCompleted, em
     }
   }
 
-  if (alreadyCompleted) {
+  if (isLockedComplete) {
     return (
       <div className="mx-auto max-w-2xl px-4 py-10">
         <div className="rounded-lg border border-green-200 bg-green-50 p-6 text-center">
@@ -137,6 +151,18 @@ export default function FormWizard({ form, existingAnswers, alreadyCompleted, em
         <p className="mt-1 inline-block rounded bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
           Testing mode — most required fields are not enforced (signature confirmation always is)
         </p>
+      )}
+      {alreadyCompleted && canEditCompleted && (
+        <p className="mt-1 inline-block rounded bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800">
+          Editing an already-completed form (manager access)
+        </p>
+      )}
+
+      {reviewComment && (
+        <div className="mt-4 rounded-lg border border-red-200 bg-red-50 p-4">
+          <p className="text-sm font-medium text-red-800">This form was sent back — please review before resubmitting:</p>
+          <p className="mt-1 text-sm text-red-700">{reviewComment}</p>
+        </div>
       )}
 
       <div className="mt-4 rounded-lg border border-gray-200 bg-white p-6">

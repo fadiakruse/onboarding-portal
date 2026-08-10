@@ -126,6 +126,9 @@ export async function POST(request: Request) {
   const { error: dbError } = await supabase.from('employee_forms').update({
     status: 'completed', answers: printableAnswers, pdf_path: path,
     completed_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+    // Clear any prior rejection so a resubmission goes back to "awaiting
+    // review" instead of carrying the old rejected/accepted state forward.
+    review_status: null, review_comment: null, reviewed_by: null, reviewed_at: null,
   }).eq('employee_id', user.id).eq('form_id', form.id);
 
   if (dbError) {

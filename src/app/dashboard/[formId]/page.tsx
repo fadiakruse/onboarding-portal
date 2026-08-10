@@ -13,9 +13,12 @@ export default async function FormPage({ params }: { params: { formId: string } 
   } = await supabase.auth.getUser();
   if (!user) redirect('/login');
 
+  const { data: myProfile } = await supabase.from('profiles').select('role').eq('id', user.id).single();
+  const isManager = myProfile?.role === 'manager';
+
   const { data: statusRows } = await supabase
     .from('employee_forms')
-    .select('form_id, status, answers')
+    .select('form_id, status, answers, review_comment')
     .eq('employee_id', user.id);
 
   const statusMap = new Map((statusRows ?? []).map((r) => [r.form_id, r]));
@@ -42,6 +45,8 @@ export default async function FormPage({ params }: { params: { formId: string } 
       form={form}
       existingAnswers={existing?.answers ?? {}}
       alreadyCompleted={alreadyCompleted}
+      canEditCompleted={isManager}
+      reviewComment={existing?.review_comment ?? null}
       employeeName={profileRow?.full_name || profileRow?.email || 'Employee'}
       profile={profile}
     />

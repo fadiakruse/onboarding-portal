@@ -12,10 +12,16 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Missing path' }, { status: 400 });
   }
 
+  // download=true forces a Content-Disposition: attachment signed URL (real
+  // download). Omitted/false serves the file inline, which browsers render
+  // directly for PDFs/images in their default viewer.
+  const forceDownload = request.nextUrl.searchParams.get('download') === 'true';
+  const filename = path.split('/').pop() || 'file';
+
   const supabase = adminStorageClient();
   const { data, error } = await supabase.storage
     .from('new-hire-forms')
-    .createSignedUrl(path, 300); // 5 minutes
+    .createSignedUrl(path, 300, forceDownload ? { download: filename } : undefined);
 
   if (error || !data) {
     return NextResponse.json({ error: error?.message || 'Failed to sign URL' }, { status: 500 });
