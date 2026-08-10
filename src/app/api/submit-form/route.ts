@@ -50,15 +50,18 @@ export async function POST(request: Request) {
 
   let firstName = '';
   let lastName = '';
+  let hireDate = '';
   if (form.id === form1.id) {
     firstName = answers.firstName || '';
     lastName = answers.lastName || '';
+    hireDate = answers.startDate || '';
   } else {
     const form1Answers = statusMap.get(form1.id)?.answers as Record<string, any> | undefined;
     firstName = form1Answers?.firstName || '';
     lastName = form1Answers?.lastName || '';
+    hireDate = form1Answers?.startDate || '';
   }
-
+  
   const employeeName = profile?.full_name || profile?.email || user.email || 'Employee';
   const practiceName = process.env.NEXT_PUBLIC_PRACTICE_NAME || 'Your Practice';
 
@@ -97,6 +100,7 @@ export async function POST(request: Request) {
         answers: printableAnswers,
         signatureDataUrl: signature || '',
         submittedAt: new Date(),
+        hireDate,
       });
     } else {
       pdfBytes = await generateFormPdf({

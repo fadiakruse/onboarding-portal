@@ -4,18 +4,23 @@ const W4_SOURCE_URL = 'https://www.irs.gov/pub/irs-pdf/fw4.pdf';
 
 // Fixed employer info for the "Employers Only" row — this practice's
 // details never change, so it's auto-filled every time rather than asked
-// of the employee.
-const EMPLOYER_NAME_ADDRESS =
-  'The Radiology Group of New Jersey LLC D/B/A The Medical Group of New Jersey - 57 US Hwy 46, Hackettstown, NJ 07840';
+// of the employee. Printed as 3 lines rather than filled into the single-
+// line form field, since the field itself isn't tall enough for 3 lines.
+const EMPLOYER_NAME_ADDRESS_LINES = [
+  'The Radiology Group of New Jersey LLC',
+  'D/B/A The Medical Group of New Jersey',
+  '57 US Hwy 46, Hackettstown, NJ 07840',
+];
 const EMPLOYER_EIN = '82-3079541';
 
 interface GenerateW4Params {
   answers: Record<string, any>;
   signatureDataUrl: string;
   submittedAt: Date;
+  hireDate?: string;
 }
 
-export async function generateW4Pdf({ answers, signatureDataUrl, submittedAt }: GenerateW4Params): Promise<Uint8Array> {
+export async function generateW4Pdf({ answers, signatureDataUrl, submittedAt, hireDate }: GenerateW4Params): Promise<Uint8Array> {
   const upstream = await fetch(W4_SOURCE_URL, {
     headers: { 'User-Agent': 'Mozilla/5.0 (compatible; NavesinkDerm-OnboardingPortal/1.0)' },
   });
@@ -83,24 +88,21 @@ export async function generateW4Pdf({ answers, signatureDataUrl, submittedAt }: 
   // Exempt
   setCheck('topmostSubform[0].Page1[0].c1_3[0]', !!answers.w4Exempt);
 
-  // "Employers Only" row (f1_12 / f1_13 / f1_14) — the IRS's own layout
-  // puts this row directly below the employee signature line. f1_12 is
-  // Employer's name and address, f1_14 is the EIN — both fixed for this
-  // practice, so they're auto-filled every time. f1_13 (First date of
-  // employment) is left blank for HR/payroll to complete separately.
-  setText('topmostSubform[0].Page1[0].f1_12[0]', EMPLOYER_NAME_ADDRESS);
+  // "Employers Only" row. f1_12 (Employer's name and address) is intentionally
+  // NOT filled via the form field — it's drawn as 3 lines of free text below
+  // instead, since the field itself is only tall enough for one line. f1_13
+  // (First date of employment) is auto-filled from the hire date collected on
+  // the Employee Data Form. f1_14 (EIN) is fixed for this practice.
+  setText('topmostSubform[0].Page1[0].f1_13[0]', hireDate);
   setText('topmostSubform[0].Page1[0].f1_14[0]', EMPLOYER_EIN);
 
   const helv = await pdfDoc.embedFont(StandardFonts.Helvetica);
   const page = pdfDoc.getPages()[0];
 
   // The actual "Employee's signature ... Date" line (Step 5: Sign Here) has
-  // no fillable AcroForm field at all — the IRS left it as ink-only. It sits
-  // directly above the Employers Only row (y=36), so both are drawn as free
-  // page content rather than filled into a form field. This position is a
-  // careful estimate from the surrounding fields' coordinates; nudge the y
-  // value here if it needs adjusting once you see a real output.
-  const signLineY = 65;
+  // no fillable AcroForm field — the IRS left it as ink-only. Drawn as free
+  // page content, positioned just above the Employers Only row.
+  const signLineY = 80;
 
   if (signatureDataUrl) {
     try {
@@ -115,13 +117,24 @@ export async function generateW4Pdf({ answers, signatureDataUrl, submittedAt }: 
     }
   }
 
-  // Date — server-generated timestamp, not client-supplied, so it can't be
-  // spoofed. Drawn next to the signature on the same line.
   page.drawText(submittedAt.toLocaleDateString('en-US'), {
-    x: 420,
+    x: 480,
     y: signLineY + 4,
     size: 10,
     font: helv,
+  });
+
+  // Employer's name and address — 3 lines, small font, drawn directly over
+  // the f1_12 field's location rather than filled into the single-line field.
+  const addressFontSize = 7;
+  const addressLineHeight = 9;
+  EMPLOYER_NAME_ADDRESS_LINES.forEach((line, i) => {
+    page.drawText(line, {
+      x: 95,
+      y: 54 - i * addressLineHeight,
+      size: addressFontSize,
+      font: helv,
+    });
   });
 
   form.updateFieldAppearances(helv);
