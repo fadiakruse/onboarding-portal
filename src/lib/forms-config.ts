@@ -63,7 +63,7 @@ export const FORMS: FormConfig[] = [
       { id: 'salaryBasis', label: 'Salary Basis', type: 'radio', options: ['Per hour', 'Annually'], required: true },
       { id: 'specialConditions', label: 'Special Conditions of Employment (if any)', type: 'textarea' },
     ], requiresSignature: true },
-   { id: '02-w4-2026', order: 2, title: "Form W-4 (2026) — Employee's Withholding Certificate", shortTitle: 'W-4 (2026)',
+  { id: '02-w4-2026', order: 2, title: "Form W-4 (2026) — Employee's Withholding Certificate", shortTitle: 'W-4 (2026)',
     intro: ['Complete the fields below \u2014 this automatically fills out the official IRS Form W-4 and saves the completed, signed form for your records.'],
     linkText: 'View a blank copy of the official Form W-4', linkUrl: 'https://www.irs.gov/pub/irs-pdf/fw4.pdf',
     fields: [
@@ -83,7 +83,7 @@ export const FORMS: FormConfig[] = [
       { id: 'w4Exempt', label: 'I claim exemption from withholding for 2026 (see the linked form for eligibility)', type: 'checkbox' },
     ],
     requiresSignature: true },
-
+  { id: '03-i9-2026', order: 3, title: 'Form I-9 — Employment Eligibility Verification (Section 1)', shortTitle: 'I-9 (Section 1)',
     intro: ['Complete Section 1 only of the official USCIS Form I-9 below using your browser\u2019s PDF tools. Section 2 (document review) will be completed by your employer/HR representative.', 'When finished, save/download the completed PDF and upload it here.'],
     embeddedOfficialPdf: { key: 'i9', uploadFieldId: 'completedI9File', label: 'Upload your completed I-9 PDF (Section 1)' },
     fields: [{ id: 'completedI9File', label: 'Upload your completed I-9 PDF (Section 1)', type: 'fileUpload', accept: 'application/pdf', required: true }],
