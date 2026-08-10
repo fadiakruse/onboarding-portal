@@ -13,6 +13,16 @@ const EMPLOYER_NAME_ADDRESS_LINES = [
 ];
 const EMPLOYER_EIN = '82-3079541';
 
+function formatDateDDMMYYYY(dateStr: string): string {
+  if (!dateStr) return '';
+  const d = new Date(`${dateStr}T00:00:00`);
+  if (isNaN(d.getTime())) return dateStr;
+  const dd = String(d.getDate()).padStart(2, '0');
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const yyyy = d.getFullYear();
+  return `${mm}/${dd}/${yyyy}`;
+}
+
 interface GenerateW4Params {
   answers: Record<string, any>;
   signatureDataUrl: string;
@@ -92,8 +102,8 @@ export async function generateW4Pdf({ answers, signatureDataUrl, submittedAt, hi
   // NOT filled via the form field — it's drawn as 3 lines of free text below
   // instead, since the field itself is only tall enough for one line. f1_13
   // (First date of employment) is auto-filled from the hire date collected on
-  // the Employee Data Form. f1_14 (EIN) is fixed for this practice.
-  setText('topmostSubform[0].Page1[0].f1_13[0]', hireDate);
+  // the Employee Data Form, formatted dd/mm/yyyy. f1_14 (EIN) is fixed.
+  setText('topmostSubform[0].Page1[0].f1_13[0]', formatDateDDMMYYYY(hireDate || ''));
   setText('topmostSubform[0].Page1[0].f1_14[0]', EMPLOYER_EIN);
 
   const helv = await pdfDoc.embedFont(StandardFonts.Helvetica);
@@ -102,14 +112,14 @@ export async function generateW4Pdf({ answers, signatureDataUrl, submittedAt, hi
   // The actual "Employee's signature ... Date" line (Step 5: Sign Here) has
   // no fillable AcroForm field — the IRS left it as ink-only. Drawn as free
   // page content, positioned just above the Employers Only row.
-  const signLineY = 80;
+  const signLineY = 88;
 
   if (signatureDataUrl) {
     try {
       const base64 = signatureDataUrl.split(',')[1];
       const pngBytes = Buffer.from(base64, 'base64');
       const pngImage = await pdfDoc.embedPng(pngBytes);
-      const sigHeight = 20;
+      const sigHeight = 60; // 3x the original 20
       const sigWidth = (pngImage.width / pngImage.height) * sigHeight;
       page.drawImage(pngImage, { x: 95, y: signLineY, width: sigWidth, height: sigHeight });
     } catch (err) {
@@ -128,10 +138,11 @@ export async function generateW4Pdf({ answers, signatureDataUrl, submittedAt, hi
   // the f1_12 field's location rather than filled into the single-line field.
   const addressFontSize = 7;
   const addressLineHeight = 9;
+  const addressStartY = 56; // 2pt higher than before
   EMPLOYER_NAME_ADDRESS_LINES.forEach((line, i) => {
     page.drawText(line, {
       x: 95,
-      y: 54 - i * addressLineHeight,
+      y: addressStartY - i * addressLineHeight,
       size: addressFontSize,
       font: helv,
     });
