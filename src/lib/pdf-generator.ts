@@ -1,0 +1,129 @@
+import { PDFDocument, StandardFonts, rgb, PDFFont } from 'pdf-lib';
+import { FormConfig } from './forms-config';
+
+const PAGE_MARGIN = 56;
+const PAGE_WIDTH = 612;
+const PAGE_HEIGHT = 792;
+const CONTENT_WIDTH = PAGE_WIDTH - PAGE_MARGIN * 2;
+
+interface GeneratePdfOptions {
+  form: FormConfig;
+  answers: Record<string, any>;
+  employeeName: string;
+  signatureDataUrl: string;
+  practiceName: string;
+  submittedAt: Date;
+}
+
+function wrapText(text: string, font: PDFFont, size: number, maxWidth: number): string[] {
+  const words = text.split(/\s+/);
+  const lines: string[] = [];
+  let current = '';
+  for (const word of words) {
+    const trial = current ? `${current} ${word}` : word;
+    if (font.widthOfTextAtSize(trial, size) > maxWidth && current) {
+      lines.push(current);
+      current = word;
+    } else {
+      current = trial;
+    }
+  }
+  if (current) lines.push(current);
+  return lines;
+}
+
+export async function generateFormPdf(opts: GeneratePdfOptions): Promise<Uint8Array> {
+  const { form, answers, employeeName, signatureDataUrl, practiceName, submittedAt } = opts;
+
+  const pdfDoc = await PDFDocument.create();
+  const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+  const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+
+  let page = pdfDoc.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
+  let y = PAGE_HEIGHT - PAGE_MARGIN;
+
+  const newPageIfNeeded = (needed: number) => {
+    if (y - needed < PAGE_MARGIN) {
+      page = pdfDoc.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
+      y = PAGE_HEIGHT - PAGE_MARGIN;
+    }
+  };
+
+  const drawHeader = () => {
+    page.drawText(practiceName, { x: PAGE_MARGIN, y, size: 10, font: boldFont, color: rgb(0.2, 0.2, 0.2) });
+    y -= 22;
+    page.drawText(form.title, { x: PAGE_MARGIN, y, size: 15, font: boldFont });
+    y -= 10;
+    page.drawLine({ start: { x: PAGE_MARGIN, y }, end: { x: PAGE_WIDTH - PAGE_MARGIN, y }, thickness: 1, color: rgb(0.8, 0.8, 0.8) });
+    y -= 22;
+  };
+
+  drawHeader();
+
+  for (const para of form.intro) {
+    const lines = wrapText(para, font, 10, CONTENT_WIDTH);
+    for (const line of lines) {
+      newPageIfNeeded(14);
+      page.drawText(line, { x: PAGE_MARGIN, y, size: 10, font, color: rgb(0.25, 0.25, 0.25) });
+      y -= 14;
+    }
+    y -= 6;
+  }
+
+  y -= 4;
+
+  for (const field of form.fields) {
+    const rawValue = answers[field.id];
+    if (rawValue === undefined || rawValue === null || rawValue === '') continue;
+
+    const value = Array.isArray(rawValue) ? rawValue.join(', ') : String(rawValue);
+
+    newPageIfNeeded(30);
+    page.drawText(field.label, { x: PAGE_MARGIN, y, size: 9, font: boldFont, color: rgb(0.35, 0.35, 0.35) });
+    y -= 13;
+
+    const valueLines = wrapText(value, font, 11, CONTENT_WIDTH);
+    for (const line of valueLines) {
+      newPageIfNeeded(16);
+      page.drawText(line, { x: PAGE_MARGIN, y, size: 11, font });
+      y -= 15;
+    }
+    y -= 8;
+  }
+
+  newPageIfNeeded(140);
+  y -= 10;
+  page.drawLine({ start: { x: PAGE_MARGIN, y }, end: { x: PAGE_WIDTH - PAGE_MARGIN, y }, thickness: 1, color: rgb(0.85, 0.85, 0.85) });
+  y -= 20;
+
+  page.drawText('Employee Signature', { x: PAGE_MARGIN, y, size: 9, font: boldFont, color: rgb(0.35, 0.35, 0.35) });
+  y -= 8;
+
+  if (signatureDataUrl?.startsWith('data:image/png')) {
+    const base64 = signatureDataUrl.split(',')[1];
+    const bytes = Uint8Array.from(Buffer.from(base64, 'base64'));
+    const sigImage = await pdfDoc.embedPng(bytes);
+    const sigDims = sigImage.scale(0.35);
+    const maxSigWidth = 220;
+    const scaleFactor = Math.min(1, maxSigWidth / sigDims.width);
+    const w = sigDims.width * scaleFactor;
+    const h = sigDims.height * scaleFactor;
+    newPageIfNeeded(h + 10);
+    page.drawImage(sigImage, { x: PAGE_MARGIN, y: y - h, width: w, height: h });
+    y -= h + 6;
+  } else {
+    y -= 30;
+  }
+
+  page.drawLine({ start: { x: PAGE_MARGIN, y }, end: { x: PAGE_MARGIN + 220, y }, thickness: 0.75, color: rgb(0.5, 0.5, 0.5) });
+  y -= 16;
+
+  page.drawText(`Signed by: ${employeeName}`, { x: PAGE_MARGIN, y, size: 10, font });
+  y -= 14;
+  page.drawText(
+    `Date: ${submittedAt.toLocaleDateString('en-US')} at ${submittedAt.toLocaleTimeString('en-US')}`,
+    { x: PAGE_MARGIN, y, size: 10, font }
+  );
+
+  return pdfDoc.save();
+}
