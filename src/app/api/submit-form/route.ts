@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { FORMS, getFormById } from '@/lib/forms-config';
 import { generateFormPdf } from '@/lib/pdf-generator';
 import { sanitizeFolderSegment } from '@/lib/formatters';
+import { generateW4Pdf } from '@/lib/pdf-w4-generator';
 
 function extFromDataUrl(dataUrl: string): string {
   const match = /^data:([^;]+);base64,/.exec(dataUrl);
@@ -91,11 +92,19 @@ export async function POST(request: Request) {
 
   let pdfBytes: Uint8Array;
   try {
-    pdfBytes = await generateFormPdf({
-      form, answers: printableAnswers,
-      employeeName: [firstName, lastName].filter(Boolean).join(' ') || employeeName,
-      signatureDataUrl: signature || '', practiceName, submittedAt: new Date(),
-    });
+    if (form.id === '02-w4-2026') {
+      pdfBytes = await generateW4Pdf({
+        answers: printableAnswers,
+        signatureDataUrl: signature || '',
+        submittedAt: new Date(),
+      });
+    } else {
+      pdfBytes = await generateFormPdf({
+        form, answers: printableAnswers,
+        employeeName: [firstName, lastName].filter(Boolean).join(' ') || employeeName,
+        signatureDataUrl: signature || '', practiceName, submittedAt: new Date(),
+      });
+    }
   } catch (err) {
     console.error('PDF generation failed', err);
     return NextResponse.json({ error: 'Could not generate PDF.' }, { status: 500 });
