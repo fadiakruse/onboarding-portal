@@ -20,7 +20,7 @@ function formatDateDDMMYYYY(dateStr: string): string {
   const dd = String(d.getDate()).padStart(2, '0');
   const mm = String(d.getMonth() + 1).padStart(2, '0');
   const yyyy = d.getFullYear();
-  return `${mm}/${dd}/${yyyy}`;
+  return `${dd}/${mm}/${yyyy}`;
 }
 
 interface GenerateW4Params {
@@ -111,8 +111,10 @@ export async function generateW4Pdf({ answers, signatureDataUrl, submittedAt, hi
 
   // The actual "Employee's signature ... Date" line (Step 5: Sign Here) has
   // no fillable AcroForm field — the IRS left it as ink-only. Drawn as free
-  // page content, positioned just above the Employers Only row.
-  const signLineY = 88;
+  // page content, positioned just above the Employers Only row. Signature
+  // and date are positioned independently since they've been tuned separately.
+  const signatureY = 82;
+  const dateY = 92;
 
   if (signatureDataUrl) {
     try {
@@ -121,7 +123,7 @@ export async function generateW4Pdf({ answers, signatureDataUrl, submittedAt, hi
       const pngImage = await pdfDoc.embedPng(pngBytes);
       const sigHeight = 60; // 3x the original 20
       const sigWidth = (pngImage.width / pngImage.height) * sigHeight;
-      page.drawImage(pngImage, { x: 95, y: signLineY, width: sigWidth, height: sigHeight });
+      page.drawImage(pngImage, { x: 95, y: signatureY, width: sigWidth, height: sigHeight });
     } catch (err) {
       console.error('Could not draw signature onto W-4', err);
     }
@@ -129,7 +131,7 @@ export async function generateW4Pdf({ answers, signatureDataUrl, submittedAt, hi
 
   page.drawText(submittedAt.toLocaleDateString('en-US'), {
     x: 480,
-    y: signLineY + 4,
+    y: dateY,
     size: 10,
     font: helv,
   });
@@ -138,7 +140,7 @@ export async function generateW4Pdf({ answers, signatureDataUrl, submittedAt, hi
   // the f1_12 field's location rather than filled into the single-line field.
   const addressFontSize = 7;
   const addressLineHeight = 9;
-  const addressStartY = 56; // 2pt higher than before
+  const addressStartY = 56;
   EMPLOYER_NAME_ADDRESS_LINES.forEach((line, i) => {
     page.drawText(line, {
       x: 95,
