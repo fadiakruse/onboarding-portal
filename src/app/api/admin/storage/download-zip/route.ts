@@ -51,13 +51,14 @@ export async function GET(request: NextRequest) {
     zip.file(relativePath, bytes);
   }
 
-  // uint8array (not nodebuffer) so the result is a plain Uint8Array, which
-  // NextResponse's BodyInit type accepts cleanly — a Node Buffer trips up
-  // TypeScript here even though it works fine at runtime.
   const zipBytes = await zip.generateAsync({ type: 'uint8array' });
   const folderName = path.split('/').filter(Boolean).pop() || 'download';
 
-  return new NextResponse(zipBytes, {
+  // The type assertion here works around a known TypeScript typing mismatch
+  // between @types/node's Uint8Array/Buffer generics and the DOM BodyInit
+  // type in this project's config — the value itself is valid raw bytes at
+  // runtime regardless of what the type checker infers.
+  return new NextResponse(zipBytes as unknown as BodyInit, {
     status: 200,
     headers: {
       'Content-Type': 'application/zip',
