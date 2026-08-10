@@ -47,11 +47,14 @@ export async function GET(request: NextRequest) {
     const { data, error } = await supabase.storage.from('new-hire-forms').download(filePath);
     if (error || !data) continue;
     const relativePath = filePath.slice(path.length).replace(/^\/+/, '');
-    const bytes = Buffer.from(await data.arrayBuffer());
+    const bytes = new Uint8Array(await data.arrayBuffer());
     zip.file(relativePath, bytes);
   }
 
-  const zipBytes = await zip.generateAsync({ type: 'nodebuffer' });
+  // uint8array (not nodebuffer) so the result is a plain Uint8Array, which
+  // NextResponse's BodyInit type accepts cleanly — a Node Buffer trips up
+  // TypeScript here even though it works fine at runtime.
+  const zipBytes = await zip.generateAsync({ type: 'uint8array' });
   const folderName = path.split('/').filter(Boolean).pop() || 'download';
 
   return new NextResponse(zipBytes, {
