@@ -2,6 +2,13 @@ import { PDFDocument, StandardFonts } from 'pdf-lib';
 
 const W4_SOURCE_URL = 'https://www.irs.gov/pub/irs-pdf/fw4.pdf';
 
+// Fixed employer info for the "Employers Only" row — this practice's
+// details never change, so it's auto-filled every time rather than asked
+// of the employee.
+const EMPLOYER_NAME_ADDRESS =
+  'The Radiology Group of New Jersey LLC D/B/A The Medical Group of New Jersey - 57 US Hwy 46, Hackettstown, NJ 07840';
+const EMPLOYER_EIN = '82-3079541';
+
 interface GenerateW4Params {
   answers: Record<string, any>;
   signatureDataUrl: string;
@@ -76,35 +83,47 @@ export async function generateW4Pdf({ answers, signatureDataUrl, submittedAt }: 
   // Exempt
   setCheck('topmostSubform[0].Page1[0].c1_3[0]', !!answers.w4Exempt);
 
-  // Signature — drawn as the actual signature image (drawn or typed-cursive
-  // PNG captured by the existing SignaturePad), positioned over the real
-  // signature field's location rather than typed as plain text.
+  // "Employers Only" row (f1_12 / f1_13 / f1_14) — the IRS's own layout
+  // puts this row directly below the employee signature line. f1_12 is
+  // Employer's name and address, f1_14 is the EIN — both fixed for this
+  // practice, so they're auto-filled every time. f1_13 (First date of
+  // employment) is left blank for HR/payroll to complete separately.
+  setText('topmostSubform[0].Page1[0].f1_12[0]', EMPLOYER_NAME_ADDRESS);
+  setText('topmostSubform[0].Page1[0].f1_14[0]', EMPLOYER_EIN);
+
+  const helv = await pdfDoc.embedFont(StandardFonts.Helvetica);
+  const page = pdfDoc.getPages()[0];
+
+  // The actual "Employee's signature ... Date" line (Step 5: Sign Here) has
+  // no fillable AcroForm field at all — the IRS left it as ink-only. It sits
+  // directly above the Employers Only row (y=36), so both are drawn as free
+  // page content rather than filled into a form field. This position is a
+  // careful estimate from the surrounding fields' coordinates; nudge the y
+  // value here if it needs adjusting once you see a real output.
+  const signLineY = 65;
+
   if (signatureDataUrl) {
     try {
       const base64 = signatureDataUrl.split(',')[1];
       const pngBytes = Buffer.from(base64, 'base64');
       const pngImage = await pdfDoc.embedPng(pngBytes);
-      const sigField = form.getTextField('topmostSubform[0].Page1[0].f1_12[0]');
-      const widget = sigField.acroField.getWidgets()[0];
-      const rect = widget.getRectangle();
-      const page = pdfDoc.getPages()[0];
-      const sigHeight = Math.min(rect.height, 22);
+      const sigHeight = 20;
       const sigWidth = (pngImage.width / pngImage.height) * sigHeight;
-      page.drawImage(pngImage, {
-        x: rect.x + 2,
-        y: rect.y + (rect.height - sigHeight) / 2,
-        width: sigWidth,
-        height: sigHeight,
-      });
+      page.drawImage(pngImage, { x: 95, y: signLineY, width: sigWidth, height: sigHeight });
     } catch (err) {
       console.error('Could not draw signature onto W-4', err);
     }
   }
 
-  // Date — server-generated timestamp, not client-supplied, so it can't be spoofed.
-  setText('topmostSubform[0].Page1[0].f1_13[0]', submittedAt.toLocaleDateString('en-US'));
+  // Date — server-generated timestamp, not client-supplied, so it can't be
+  // spoofed. Drawn next to the signature on the same line.
+  page.drawText(submittedAt.toLocaleDateString('en-US'), {
+    x: 420,
+    y: signLineY + 4,
+    size: 10,
+    font: helv,
+  });
 
-  const helv = await pdfDoc.embedFont(StandardFonts.Helvetica);
   form.updateFieldAppearances(helv);
   form.flatten();
 
