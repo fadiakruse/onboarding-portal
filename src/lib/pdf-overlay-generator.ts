@@ -101,10 +101,10 @@ export async function fillHipaaConfidentialityPdf({ printName, signatureDataUrl,
   return fillOverlayPdf({
     sourceFile: '05-hipaa-confidentiality.pdf',
     texts: [
-      { page: 0, x: 455, y: 104, value: submittedAt.toLocaleDateString('en-US'), size: 10 },
+      { page: 0, x: 455, y: 106, value: submittedAt.toLocaleDateString('en-US'), size: 10 },
       { page: 0, x: 140, y: 76, value: printName, size: 11 },
     ],
-    signature: { page: 0, x: 72, y: 100, dataUrl: signatureDataUrl, maxWidth: 230, maxHeight: 58 },
+    signature: { page: 0, x: 74, y: 99, dataUrl: signatureDataUrl, maxWidth: 460, maxHeight: 116 },
   });
 }
 
@@ -120,7 +120,7 @@ export async function fillHipaaCompliancePdf({ signatureDataUrl, submittedAt }: 
     texts: [
       { page: 0, x: 72, y: 97, value: submittedAt.toLocaleDateString('en-US'), size: 10 },
     ],
-    signature: { page: 0, x: 72, y: 113, dataUrl: signatureDataUrl, maxWidth: 220, maxHeight: 55 },
+    signature: { page: 0, x: 72, y: 116, dataUrl: signatureDataUrl, maxWidth: 440, maxHeight: 110 },
   });
 }
 
@@ -145,9 +145,9 @@ export async function fillJobExposurePdf({ employeeName, exposureCategory, signa
     texts: [
       { page: 0, x: 200, y: 562, value: employeeName, size: 11 },
       { page: 0, x: 72, y: 535, value: `Selected: ${exposureCategory}`, size: 11, bold: true },
-      { page: 0, x: 470, y: 145, value: submittedAt.toLocaleDateString('en-US'), size: 10 },
+      { page: 0, x: 470, y: 147, value: submittedAt.toLocaleDateString('en-US'), size: 10 },
     ],
-    signature: { page: 0, x: 260, y: 142, dataUrl: signatureDataUrl, maxWidth: 220, maxHeight: 45 },
+    signature: { page: 0, x: 260, y: 142, dataUrl: signatureDataUrl, maxWidth: 440, maxHeight: 90 },
   });
 }
 
@@ -170,12 +170,12 @@ export async function fillTmgnjConfidentialityPdf({ employeeName, signatureDataU
   // Name field near the top of page 1 ("Employee Name: ____"), just below
   // the title and above the "This Confidentiality Agreement is made
   // between..." paragraph.
-  pages[0].drawText(employeeName, { x: 150, y: pages[0].getHeight() - 175, size: 11, font });
+  pages[0].drawText(employeeName, { x: 150, y: pages[0].getHeight() - 176, size: 11, font });
 
   // Signature + Date on the last page's signature line — already correct.
   const lastPage = pages[lastPageIndex];
-  await drawSignatureImage(pdfDoc, lastPage, { page: lastPageIndex, x: 72, y: 100, dataUrl: signatureDataUrl, maxWidth: 220, maxHeight: 55 });
-  lastPage.drawText(submittedAt.toLocaleDateString('en-US'), { x: 320, y: 116, size: 10, font });
+  await drawSignatureImage(pdfDoc, lastPage, { page: lastPageIndex, x: 72, y: 99, dataUrl: signatureDataUrl, maxWidth: 440, maxHeight: 110 });
+  lastPage.drawText(submittedAt.toLocaleDateString('en-US'), { x: 320, y: 115, size: 10, font });
 
   return pdfDoc.save();
 }
