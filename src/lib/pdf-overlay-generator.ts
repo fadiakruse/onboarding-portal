@@ -10,12 +10,13 @@ import path from 'path';
 // at fixed coordinates, same technique already used for the W-4's signature/
 // date/employer-address overlay in pdf-w4-generator.ts.
 //
-// IMPORTANT — coordinates below are first-pass estimates based on the plain
-// text layout of each source document (Letter size, 612x792pt, origin at
-// bottom-left). They have NOT been visually verified against the rendered
-// PDFs. Expect one round of "nudge the numbers" the same way the W-4's
-// signature position was tuned in past commits — generate one real submission
-// per document, open the resulting PDF, and adjust x/y as needed.
+// Coordinates below are second-pass, adjusted against real rendered output
+// from a live test submission (2026-08-21) — first-pass estimates had the
+// date overlapping labels on 05/06, name/date/signature floating too high
+// above the line on 07, and the employee name landing mid-paragraph on 08.
+// All four fixed below. If anything's still off after this round, it's the
+// same kind of nudge the W-4 signature went through — small y/x adjustment,
+// not a structural issue.
 const FORMS_DIR = path.join(process.cwd(), 'public', 'forms');
 
 function loadSourceBytes(filename: string): Buffer {
@@ -93,28 +94,31 @@ interface SimpleSignParams {
 }
 
 // Item 6 — Step 5, Employee HIPAA Confidentiality Agreement.
-// Source doc is a single page ending with a "Signature ... Date" line
-// followed by "Print Name" below it.
+// FIXED: date was overlapping the "Signature:" line text (moved right to sit
+// under "Date:" instead); printName was overlapping the "Print Name:" label
+// itself (moved right past the label, onto the blank line).
 export async function fillHipaaConfidentialityPdf({ printName, signatureDataUrl, submittedAt }: SimpleSignParams): Promise<Uint8Array> {
   return fillOverlayPdf({
     sourceFile: '05-hipaa-confidentiality.pdf',
     texts: [
-      { page: 0, x: 300, y: 98, value: submittedAt.toLocaleDateString('en-US'), size: 10 },
-      { page: 0, x: 72, y: 76, value: printName, size: 11 },
+      { page: 0, x: 455, y: 98, value: submittedAt.toLocaleDateString('en-US'), size: 10 },
+      { page: 0, x: 140, y: 76, value: printName, size: 11 },
     ],
     signature: { page: 0, x: 72, y: 104, dataUrl: signatureDataUrl, maxWidth: 190, maxHeight: 45 },
   });
 }
 
-// Item 7 — Step 6, HIPAA Compliance Form. Two side-by-side signature lines
-// (Employee / Compliance Officer) with a single Date line beneath — only the
-// Employee side + Date are filled; the Compliance Officer line stays blank
-// for the office to complete separately.
+// Item 7 — Step 6, HIPAA Compliance Form. Employee signature/date were
+// already landing correctly under "Signature of Employee" (the other, larger
+// scrawl on the right is the Compliance Officer's pre-existing signature,
+// already part of the source template — not drawn by this code).
+// FIXED: date was overlapping the "Date" label directly beneath it — moved
+// up so it sits cleanly on the blank line above the label.
 export async function fillHipaaCompliancePdf({ signatureDataUrl, submittedAt }: Omit<SimpleSignParams, 'printName'>): Promise<Uint8Array> {
   return fillOverlayPdf({
     sourceFile: '06-hipaa-compliance-form.pdf',
     texts: [
-      { page: 0, x: 72, y: 84, value: submittedAt.toLocaleDateString('en-US'), size: 10 },
+      { page: 0, x: 72, y: 97, value: submittedAt.toLocaleDateString('en-US'), size: 10 },
     ],
     signature: { page: 0, x: 72, y: 106, dataUrl: signatureDataUrl, maxWidth: 190, maxHeight: 40 },
   });
@@ -127,30 +131,35 @@ interface JobExposureParams {
   submittedAt: Date;
 }
 
-// Item 8 — Step 7, Job Exposure Classification Record. The category
-// checkboxes on the original PDF aren't in a fixed, easily-targetable spot
-// from text layout alone, so rather than guess checkbox coordinates, the
-// selected category is stamped as a clear text line ("Selected: Category
-// X ...") near the top of the page — reliable regardless of exact checkbox
-// position, and unambiguous for anyone reviewing the saved PDF. Employee
-// Signature + Date go on the existing "Employee Signature ... Date" line.
+// Item 8 — Step 7, Job Exposure Classification Record.
+// FIXED (round 2, per explicit request): employee name now goes to the
+// right of the actual "Employee Name:" field near the top of the page,
+// instead of floating near the bottom signature line. The category stamp
+// moves to sit directly beneath that Employee Name line (in the gap before
+// "Exposure Determination Categories"), rather than above the title. Date +
+// signature stay down at the "Employee Signature: ___ Date: ___" line —
+// only the name itself was relocated, since that's the field it belongs in.
 export async function fillJobExposurePdf({ employeeName, exposureCategory, signatureDataUrl, submittedAt }: JobExposureParams): Promise<Uint8Array> {
   return fillOverlayPdf({
     sourceFile: '07-job-exposure-classification.pdf',
     texts: [
-      { page: 0, x: 72, y: 700, value: `Selected: ${exposureCategory}`, size: 11, bold: true },
-      { page: 0, x: 260, y: 168, value: employeeName, size: 10 },
-      { page: 0, x: 470, y: 168, value: submittedAt.toLocaleDateString('en-US'), size: 10 },
+      { page: 0, x: 200, y: 560, value: employeeName, size: 11 },
+      { page: 0, x: 72, y: 535, value: `Selected: ${exposureCategory}`, size: 11, bold: true },
+      { page: 0, x: 470, y: 130, value: submittedAt.toLocaleDateString('en-US'), size: 10 },
     ],
-    signature: { page: 0, x: 260, y: 174, dataUrl: signatureDataUrl, maxWidth: 190, maxHeight: 30 },
+    signature: { page: 0, x: 260, y: 136, dataUrl: signatureDataUrl, maxWidth: 190, maxHeight: 30 },
   });
 }
 
 // Item 9 — Step 8, TMGNJ Confidentiality Agreement. Multi-page document;
 // "including all agreement text" is satisfied by overlaying onto the actual
 // source PDF (which already contains the full agreement body) rather than
-// regenerating a summary — Name goes on the blank near the top of page 1,
-// Signature + Date on the signature line at the end of the last page.
+// regenerating a summary. Signature + Date on the last page were already
+// correctly placed above "Employee's Signature / Date" — unchanged.
+// FIXED: employee name on page 1 was landing mid-paragraph (overlapping
+// "...paid by the Practice to Employee, it hereby is agreed as follows") —
+// moved up to the actual "Employee Name: ____" blank near the top of the
+// page, right after the title.
 export async function fillTmgnjConfidentialityPdf({ employeeName, signatureDataUrl, submittedAt }: { employeeName: string; signatureDataUrl: string | null | undefined; submittedAt: Date }): Promise<Uint8Array> {
   const templateBytes = loadSourceBytes('08-tmgnj-confidentiality-agreement.pdf');
   const pdfDoc = await PDFDocument.load(templateBytes);
@@ -158,10 +167,12 @@ export async function fillTmgnjConfidentialityPdf({ employeeName, signatureDataU
   const pages = pdfDoc.getPages();
   const lastPageIndex = pages.length - 1;
 
-  // Name field near the top of page 1 ("Employee Name: ____")
-  pages[0].drawText(employeeName, { x: 190, y: pages[0].getHeight() - 300, size: 11, font });
+  // Name field near the top of page 1 ("Employee Name: ____"), just below
+  // the title and above the "This Confidentiality Agreement is made
+  // between..." paragraph.
+  pages[0].drawText(employeeName, { x: 150, y: pages[0].getHeight() - 175, size: 11, font });
 
-  // Signature + Date on the last page's signature line
+  // Signature + Date on the last page's signature line — already correct.
   const lastPage = pages[lastPageIndex];
   await drawSignatureImage(pdfDoc, lastPage, { page: lastPageIndex, x: 72, y: 100, dataUrl: signatureDataUrl, maxWidth: 190, maxHeight: 40 });
   lastPage.drawText(submittedAt.toLocaleDateString('en-US'), { x: 320, y: 108, size: 10, font });
