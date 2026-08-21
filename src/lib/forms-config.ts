@@ -88,7 +88,7 @@ export const FORMS: FormConfig[] = [
     embeddedOfficialPdf: { key: 'i9', uploadFieldId: 'completedI9File', label: 'Upload your completed I-9 PDF (Section 1)' },
     fields: [{ id: 'completedI9File', label: 'Upload your completed I-9 PDF (Section 1)', type: 'fileUpload', accept: 'application/pdf', required: true }],
     requiresSignature: true },
-  { id: '04-direct-deposit', order: 4, title: 'Direct Deposit Authorization', shortTitle: 'Direct Deposit',
+  { id: '04-direct-deposit', order: 4, title: 'Direct Deposit Authorization', shortTitle: 'Direct Deposit Authorization',
     intro: ['Please complete all information below. This authorization will remain in effect until you modify or cancel it in writing.'],
     fields: [
       { id: 'ddName', label: 'Name', type: 'text', required: true, autofillKey: 'fullName' },
@@ -109,7 +109,7 @@ export const FORMS: FormConfig[] = [
     linkText: 'Review terms of HIPAA Compliance Agreement', linkUrl: 'http://navesinkderm.com/wp-content/uploads/2026/08/06-HIPAA-Compliance-Form.pdf',
     intro: ["I have attended the facility's HIPAA compliance training program or read the HIPAA compliance training booklets, and agree to comply with these requirements to the best of my ability."],
     fields: [], requiresSignature: true },
-  { id: '07-job-exposure-classification', order: 7, title: 'Job Exposure Classification Record', shortTitle: 'Exposure Classification',
+  { id: '07-job-exposure-classification', order: 7, title: 'Job Exposure Classification Record', shortTitle: 'Job Exposure Classification',
     intro: ['Employees are classified according to work-task exposure to certain body fluids as required by the OSHA Bloodborne Standard. Select the category that matches your role.'],
     richSections: [
       { heading: 'Exposure Determination Categories' },
@@ -134,13 +134,13 @@ export const FORMS: FormConfig[] = [
       { id: 'medicarePrintName', label: 'Employee Name', type: 'text', required: true, autofillKey: 'fullName' },
       { id: 'trainingCertificate', label: 'Upload Training Completion Certificate', type: 'fileUpload', accept: 'image/*,application/pdf', required: true },
     ], requiresSignature: true },
-  { id: '11-hep-b-vaccination', order: 11, title: 'Hepatitis B Vaccination Record', shortTitle: 'Hep B Vaccination',
+  { id: '11-hep-b-vaccination', order: 11, title: 'Hepatitis B Vaccination Record', shortTitle: 'Hep B Vaccination Records',
     intro: ['All employees with potential occupation exposure (Job Risk Classification 1 & 2) to blood or other infectious materials will be offered a Hepatitis B vaccination.', 'OSHA and the CDC have identified the potential exposure risk of health care workers to the hepatitis B virus (HBV) in the course of performing their duties. For the protection of our employees, we are offering pre-screening testing (optional-not mandatory), the HBV vaccination (3 inoculations), and a follow-up antibody blood test for Hepatitis B surface antigen (given 1-2 months following 3rd inoculation - mandatory after 1/15/99) to all employees with potential exposure to blood or other potentially infectious materials.', 'In accordance with recommended OSHA and CDC guidelines this vaccine and testing is offered at no cost to the employee. You have the ability to decide whether or not you want the vaccine. If you decline at this time you may reconsider and request the vaccine at any time in the future while employed.', 'Please indicate your choice below.'],
     fields: [
       { id: 'hepBChoice', label: 'Your Choice', type: 'radio', options: ['I want to receive the pre-screening (optional — give reason in notes)', 'I want to receive the vaccine series', 'I have already had the hepatitis B vaccine series and will supply information to confirm receiving it', 'Declination: I do not want the vaccine or testing and have read the following statement: I understand that due to my occupational exposure to blood or other potentially infectious materials I may be at risk of acquiring hepatitis B virus (HBV) infection. I have been given the opportunity to be vaccinated with hepatitis B vaccine at no charge to myself. However, I decline the hepatitis B vaccination at this time. I understand that by declining this vaccine, I continue to be at risk of acquiring hepatitis B, a serious disease. If in the future I continue to have occupational exposure to blood or other potentially infectious materials and I want to be vaccinated with hepatitis B vaccine, I can receive the vaccination series at no charge to me.'], required: true },
       { id: 'hepBNotes', label: 'Notes (optional)', type: 'textarea' },
     ], requiresSignature: true },
-  { id: '12-human-trafficking-awareness', order: 12, title: 'Human Trafficking Awareness Acknowledgment', shortTitle: 'Trafficking Awareness',
+  { id: '12-human-trafficking-awareness', order: 12, title: 'Human Trafficking Awareness Acknowledgment', shortTitle: 'Human Trafficking Awareness',
     linkText: 'Review the Human Trafficking Awareness Training', linkUrl: 'https://navesinkderm.com/wp-content/uploads/2026/07/Human-Trafficking-Awareness-Training.pdf',
     intro: ['I reviewed in its entirety the training module titled "Recognizing and Responding to Human Trafficking in a Healthcare Context" (National Human Trafficking Resource Center).'],
     fields: [{ id: 'reviewDate', label: 'Date Training Was Reviewed', type: 'date', required: true, defaultToday: true }], requiresSignature: true },
