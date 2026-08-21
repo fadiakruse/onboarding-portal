@@ -4,6 +4,13 @@ import { FORMS, getFormById } from '@/lib/forms-config';
 import { generateFormPdf } from '@/lib/pdf-generator';
 import { sanitizeFolderSegment } from '@/lib/formatters';
 import { generateW4Pdf } from '@/lib/pdf-w4-generator';
+import {
+  fillHipaaConfidentialityPdf,
+  fillHipaaCompliancePdf,
+  fillJobExposurePdf,
+  fillTmgnjConfidentialityPdf,
+  appendCertificateToPdf,
+} from '@/lib/pdf-overlay-generator';
 
 function extFromDataUrl(dataUrl: string): string {
   const match = /^data:([^;]+);base64,/.exec(dataUrl);
@@ -13,6 +20,11 @@ function extFromDataUrl(dataUrl: string): string {
   if (mime === 'image/jpeg' || mime === 'image/jpg') return '.jpg';
   if (mime === 'image/webp') return '.webp';
   return '';
+}
+
+function mimeFromDataUrl(dataUrl: string): string {
+  const match = /^data:([^;]+);base64,/.exec(dataUrl);
+  return match?.[1] || 'application/octet-stream';
 }
 
 export async function POST(request: Request) {
@@ -61,8 +73,9 @@ export async function POST(request: Request) {
     lastName = form1Answers?.lastName || '';
     hireDate = form1Answers?.startDate || '';
   }
-  
+
   const employeeName = profile?.full_name || profile?.email || user.email || 'Employee';
+  const fullNameFromForm1 = [firstName, lastName].filter(Boolean).join(' ') || employeeName;
   const practiceName = process.env.NEXT_PUBLIC_PRACTICE_NAME || 'Your Practice';
 
   if (form.id === form1.id) {
@@ -77,6 +90,13 @@ export async function POST(request: Request) {
   const printableAnswers: Record<string, any> = { ...answers };
   const uploadedFileFields = form.fields.filter((f) => f.type === 'fileUpload');
 
+  // Keep the raw uploaded file (dataUrl + mimeType) around for forms that
+  // need to fold it into the generated PDF (currently just the Medicare
+  // Attestation's training certificate — item 10), even though
+  // printableAnswers below gets overwritten with a plain "Uploaded: x" label
+  // for display purposes.
+  const rawUploadedFiles: Record<string, { dataUrl: string; mimeType: string }> = {};
+
   for (const f of uploadedFileFields) {
     const fileValue = answers[f.id] as { name: string; dataUrl: string } | null | undefined;
     if (!fileValue?.dataUrl) continue;
@@ -90,6 +110,7 @@ export async function POST(request: Request) {
       console.error(`Upload failed for ${f.id}`, fileUploadError);
       return NextResponse.json({ error: `Could not save the uploaded file for "${f.label}": ${fileUploadError.message}` }, { status: 500 });
     }
+    rawUploadedFiles[f.id] = { dataUrl: fileValue.dataUrl, mimeType: mimeFromDataUrl(fileValue.dataUrl) };
     printableAnswers[f.id] = `Uploaded: ${fileValue.name}`;
   }
 
@@ -102,12 +123,42 @@ export async function POST(request: Request) {
         submittedAt: new Date(),
         hireDate,
       });
+    } else if (form.id === '05-hipaa-confidentiality') {
+      pdfBytes = await fillHipaaConfidentialityPdf({
+        printName: printableAnswers.printName || fullNameFromForm1,
+        signatureDataUrl: signature,
+        submittedAt: new Date(),
+      });
+    } else if (form.id === '06-hipaa-compliance') {
+      pdfBytes = await fillHipaaCompliancePdf({
+        signatureDataUrl: signature,
+        submittedAt: new Date(),
+      });
+    } else if (form.id === '07-job-exposure-classification') {
+      pdfBytes = await fillJobExposurePdf({
+        employeeName: fullNameFromForm1,
+        exposureCategory: printableAnswers.exposureCategory || '',
+        signatureDataUrl: signature,
+        submittedAt: new Date(),
+      });
+    } else if (form.id === '08-confidentiality-agreement') {
+      pdfBytes = await fillTmgnjConfidentialityPdf({
+        employeeName: printableAnswers.employeeFullName || fullNameFromForm1,
+        signatureDataUrl: signature,
+        submittedAt: new Date(),
+      });
     } else {
       pdfBytes = await generateFormPdf({
         form, answers: printableAnswers,
-        employeeName: [firstName, lastName].filter(Boolean).join(' ') || employeeName,
+        employeeName: fullNameFromForm1,
         signatureDataUrl: signature || '', practiceName, submittedAt: new Date(),
       });
+
+      // Item 10 — Medicare Attestation: fold the uploaded training
+      // certificate in as additional page(s) on the generated PDF.
+      if (form.id === '10-medicare-attestation' && rawUploadedFiles.trainingCertificate) {
+        pdfBytes = await appendCertificateToPdf(pdfBytes, rawUploadedFiles.trainingCertificate);
+      }
     }
   } catch (err) {
     console.error('PDF generation failed', err);

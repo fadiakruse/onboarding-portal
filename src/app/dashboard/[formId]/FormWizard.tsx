@@ -3,11 +3,12 @@
 import { useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { FormConfig, AutofillKey } from '@/lib/forms-config';
+import { FormConfig, AutofillKey, DEFAULT_CONFIRM_TEXT } from '@/lib/forms-config';
 import FormRenderer from '@/components/FormRenderer';
 import SignaturePad from '@/components/SignaturePad';
 import EmbeddedOfficialPdf from '@/components/EmbeddedOfficialPdf';
 import { TESTING_MODE } from '@/lib/config';
+import { formatDobDisplay } from '@/lib/formatters';
 
 interface FormWizardProps {
   form: FormConfig;
@@ -61,6 +62,7 @@ export default function FormWizard({
 
   const showSummary = form.order !== 1 && (profile.fullName || profile.email || profile.phone);
   const isLockedComplete = alreadyCompleted && !canEditCompleted;
+  const confirmText = form.confirmText || DEFAULT_CONFIRM_TEXT;
 
   function handleChange(fieldId: string, value: any) {
     setValues((prev) => ({ ...prev, [fieldId]: value }));
@@ -166,21 +168,24 @@ export default function FormWizard({
       )}
 
       <div className="mt-4 rounded-lg border border-gray-200 bg-white p-6">
-        {form.linkText && form.linkUrl && (
-          <a href={form.linkUrl} target="_blank" rel="noopener noreferrer"
-            className="mb-4 inline-block text-sm font-medium text-brand-600 underline hover:text-brand-700">
-            {form.linkText} ↗
-          </a>
-        )}
-
+        {/* Employee info header block now renders FIRST, with the document/
+           training link immediately below it — previously the link sat
+           above this block. */}
         {showSummary && (
           <div className="mb-5 grid grid-cols-2 gap-x-4 gap-y-1 rounded-md bg-gray-50 p-3 text-xs text-gray-600">
             <div className="col-span-2"><span className="font-medium text-gray-700">Name:</span> {profile.fullName || '—'}</div>
-            <div><span className="font-medium text-gray-700">DOB:</span> {profile.dob || '—'}</div>
+            <div><span className="font-medium text-gray-700">DOB:</span> {formatDobDisplay(profile.dob) || '—'}</div>
             <div><span className="font-medium text-gray-700">Phone:</span> {profile.phone || '—'}</div>
             <div className="col-span-2"><span className="font-medium text-gray-700">Email:</span> {profile.email || '—'}</div>
             <div className="col-span-2"><span className="font-medium text-gray-700">Address:</span> {profile.address || '—'}</div>
           </div>
+        )}
+
+        {form.linkText && form.linkUrl && (
+          <a href={form.linkUrl} target="_blank" rel="noopener noreferrer"
+             className="mb-4 inline-block text-base font-medium text-brand-600 underline hover:text-brand-700">
+            {form.linkText} ↗
+          </a>
         )}
 
         {form.intro.map((para, i) => (<p key={i} className="mb-3 text-sm text-gray-600">{para}</p>))}
@@ -214,7 +219,7 @@ export default function FormWizard({
             <div className="mt-6 border-t border-gray-100 pt-5">
               <label className="mb-4 flex items-start gap-2 text-sm text-gray-700">
                 <input type="checkbox" checked={confirmed} onChange={(e) => setConfirmed(e.target.checked)} className="mt-0.5" />
-                I confirm that I have read and understand the information provided on this page, and I acknowledge the options I have selected.
+                {confirmText}
                 <span className="text-red-500">*</span>
               </label>
 

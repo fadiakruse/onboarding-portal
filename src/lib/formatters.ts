@@ -15,3 +15,15 @@ export function formatSSN(raw: string): string {
 export function sanitizeFolderSegment(raw: string): string {
   return raw.replace(/[/\\]/g, '').trim();
 }
+
+// Displays a DOB in MM-DD-YYYY. Input comes from an HTML <input type="date">
+// field, so it arrives as YYYY-MM-DD (or empty) — this is a display-only
+// reformat and does NOT change how DOB is stored or parsed anywhere else
+// (database, W-4 autofill, etc. all keep using the raw YYYY-MM-DD value).
+export function formatDobDisplay(raw: string): string {
+  if (!raw) return '';
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(raw);
+  if (!match) return raw;
+  const [, yyyy, mm, dd] = match;
+  return `${mm}-${dd}-${yyyy}`;
+}
