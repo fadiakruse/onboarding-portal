@@ -21,14 +21,36 @@ interface FormWizardProps {
 }
 
 function renderTypedSignature(name: string): string {
+  // Bigger font (was 44px) plus a canvas that's tightly cropped to the
+  // actual text (was a fixed 600x180 box) — both changes make the typed
+  // signature's "ink" occupy much more of its own image. Since the PDF
+  // overlay code (pdf-overlay-generator.ts, pdf-w4-generator.ts) scales the
+  // whole image to fit a maxWidth/maxHeight box regardless of how much of
+  // it is blank padding, tightening the crop here is what actually makes
+  // the signature look bigger on the generated PDFs — no changes needed
+  // anywhere else, and drawn (SignaturePad) signatures are untouched since
+  // they don't go through this function at all.
+  const fontSize = 72;
+  const fontFamily = `italic 72px 'Brush Script MT', 'Segoe Script', cursive`;
+
+  // Measure the text first so the canvas can be sized tightly around it
+  // instead of using a fixed oversized box.
+  const measureCanvas = document.createElement('canvas');
+  const measureCtx = measureCanvas.getContext('2d')!;
+  measureCtx.font = fontFamily;
+  const textWidth = measureCtx.measureText(name || '').width;
+
+  const paddingX = 20;
+  const paddingY = fontSize * 0.35;
   const canvas = document.createElement('canvas');
-  canvas.width = 600;
-  canvas.height = 180;
+  canvas.width = Math.max(textWidth + paddingX * 2, 120);
+  canvas.height = fontSize + paddingY * 2;
+
   const ctx = canvas.getContext('2d')!;
   ctx.fillStyle = '#1a1a2e';
-  ctx.font = "italic 44px 'Brush Script MT', 'Segoe Script', cursive";
+  ctx.font = fontFamily;
   ctx.textBaseline = 'middle';
-  ctx.fillText(name || '', 24, canvas.height / 2);
+  ctx.fillText(name || '', paddingX, canvas.height / 2);
   return canvas.toDataURL('image/png');
 }
 
