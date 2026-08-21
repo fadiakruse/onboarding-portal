@@ -101,10 +101,10 @@ export async function fillHipaaConfidentialityPdf({ printName, signatureDataUrl,
   return fillOverlayPdf({
     sourceFile: '05-hipaa-confidentiality.pdf',
     texts: [
-      { page: 0, x: 455, y: 98, value: submittedAt.toLocaleDateString('en-US'), size: 10 },
+      { page: 0, x: 455, y: 104, value: submittedAt.toLocaleDateString('en-US'), size: 10 },
       { page: 0, x: 140, y: 76, value: printName, size: 11 },
     ],
-    signature: { page: 0, x: 72, y: 104, dataUrl: signatureDataUrl, maxWidth: 190, maxHeight: 45 },
+    signature: { page: 0, x: 72, y: 100, dataUrl: signatureDataUrl, maxWidth: 230, maxHeight: 58 },
   });
 }
 
@@ -120,7 +120,7 @@ export async function fillHipaaCompliancePdf({ signatureDataUrl, submittedAt }: 
     texts: [
       { page: 0, x: 72, y: 97, value: submittedAt.toLocaleDateString('en-US'), size: 10 },
     ],
-    signature: { page: 0, x: 72, y: 106, dataUrl: signatureDataUrl, maxWidth: 190, maxHeight: 40 },
+    signature: { page: 0, x: 72, y: 113, dataUrl: signatureDataUrl, maxWidth: 220, maxHeight: 55 },
   });
 }
 
@@ -143,11 +143,11 @@ export async function fillJobExposurePdf({ employeeName, exposureCategory, signa
   return fillOverlayPdf({
     sourceFile: '07-job-exposure-classification.pdf',
     texts: [
-      { page: 0, x: 200, y: 560, value: employeeName, size: 11 },
+      { page: 0, x: 200, y: 562, value: employeeName, size: 11 },
       { page: 0, x: 72, y: 535, value: `Selected: ${exposureCategory}`, size: 11, bold: true },
-      { page: 0, x: 470, y: 130, value: submittedAt.toLocaleDateString('en-US'), size: 10 },
+      { page: 0, x: 470, y: 145, value: submittedAt.toLocaleDateString('en-US'), size: 10 },
     ],
-    signature: { page: 0, x: 260, y: 136, dataUrl: signatureDataUrl, maxWidth: 190, maxHeight: 30 },
+    signature: { page: 0, x: 260, y: 142, dataUrl: signatureDataUrl, maxWidth: 220, maxHeight: 45 },
   });
 }
 
@@ -174,8 +174,8 @@ export async function fillTmgnjConfidentialityPdf({ employeeName, signatureDataU
 
   // Signature + Date on the last page's signature line — already correct.
   const lastPage = pages[lastPageIndex];
-  await drawSignatureImage(pdfDoc, lastPage, { page: lastPageIndex, x: 72, y: 100, dataUrl: signatureDataUrl, maxWidth: 190, maxHeight: 40 });
-  lastPage.drawText(submittedAt.toLocaleDateString('en-US'), { x: 320, y: 108, size: 10, font });
+  await drawSignatureImage(pdfDoc, lastPage, { page: lastPageIndex, x: 72, y: 100, dataUrl: signatureDataUrl, maxWidth: 220, maxHeight: 55 });
+  lastPage.drawText(submittedAt.toLocaleDateString('en-US'), { x: 320, y: 116, size: 10, font });
 
   return pdfDoc.save();
 }
