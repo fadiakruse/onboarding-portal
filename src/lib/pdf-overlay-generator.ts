@@ -104,7 +104,7 @@ export async function fillHipaaConfidentialityPdf({ printName, signatureDataUrl,
       { page: 0, x: 455, y: 108, value: submittedAt.toLocaleDateString('en-US'), size: 10 },
       { page: 0, x: 140, y: 76, value: printName, size: 11 },
     ],
-    signature: { page: 0, x: 74, y: 85, dataUrl: signatureDataUrl, maxWidth: 460, maxHeight: 116 },
+    signature: { page: 0, x: 74, y: 85, dataUrl: signatureDataUrl, maxWidth: 230, maxHeight: 58 },
   });
 }
 
@@ -120,7 +120,7 @@ export async function fillHipaaCompliancePdf({ signatureDataUrl, submittedAt }: 
     texts: [
       { page: 0, x: 90, y: 97, value: submittedAt.toLocaleDateString('en-US'), size: 10 },
     ],
-    signature: { page: 0, x: 72, y: 116, dataUrl: signatureDataUrl, maxWidth: 440, maxHeight: 110 },
+    signature: { page: 0, x: 72, y: 116, dataUrl: signatureDataUrl, maxWidth: 220, maxHeight: 55 },
   });
 }
 
