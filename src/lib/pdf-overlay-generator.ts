@@ -120,7 +120,7 @@ export async function fillHipaaCompliancePdf({ signatureDataUrl, submittedAt }: 
     texts: [
       { page: 0, x: 90, y: 97, value: submittedAt.toLocaleDateString('en-US'), size: 10 },
     ],
-    signature: { page: 0, x: 72, y: 125, dataUrl: signatureDataUrl, maxWidth: 220, maxHeight: 55 },
+    signature: { page: 0, x: 72, y: 129, dataUrl: signatureDataUrl, maxWidth: 198, maxHeight: 50 },
   });
 }
 
@@ -145,9 +145,9 @@ export async function fillJobExposurePdf({ employeeName, exposureCategory, signa
     texts: [
       { page: 0, x: 200, y: 562, value: employeeName, size: 14 },
       { page: 0, x: 72, y: 535, value: `Selected: ${exposureCategory}`, size: 11, bold: true },
-      { page: 0, x: 470, y: 149, value: submittedAt.toLocaleDateString('en-US'), size: 13 },
+      { page: 0, x: 466, y: 149, value: submittedAt.toLocaleDateString('en-US'), size: 13 },
     ],
-    signature: { page: 0, x: 251, y: 139, dataUrl: signatureDataUrl, maxWidth: 223, maxHeight: 46 },
+    signature: { page: 0, x: 247, y: 139, dataUrl: signatureDataUrl, maxWidth: 223, maxHeight: 46 },
   });
 }
 
@@ -170,12 +170,12 @@ export async function fillTmgnjConfidentialityPdf({ employeeName, signatureDataU
   // Name field near the top of page 1 ("Employee Name: ____"), just below
   // the title and above the "This Confidentiality Agreement is made
   // between..." paragraph.
-  pages[0].drawText(employeeName, { x: 150, y: pages[0].getHeight() - 186, size: 12, font });
+  pages[0].drawText(employeeName, { x: 150, y: pages[0].getHeight() - 189, size: 12, font });
 
   // Signature + Date on the last page's signature line — already correct.
   const lastPage = pages[lastPageIndex];
-  await drawSignatureImage(pdfDoc, lastPage, { page: lastPageIndex, x: 71, y: 91, dataUrl: signatureDataUrl, maxWidth: 264, maxHeight: 66 });
-  lastPage.drawText(submittedAt.toLocaleDateString('en-US'), { x: 326, y: 106, size: 11, font });
+  await drawSignatureImage(pdfDoc, lastPage, { page: lastPageIndex, x: 67, y: 89, dataUrl: signatureDataUrl, maxWidth: 224, maxHeight: 56 });
+  lastPage.drawText(submittedAt.toLocaleDateString('en-US'), { x: 328, y: 103, size: 11, font });
 
   return pdfDoc.save();
 }
