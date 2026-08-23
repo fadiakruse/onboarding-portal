@@ -29,7 +29,27 @@ function ConfirmLoginInner() {
       return;
     }
 
-    router.push('/dashboard');
+    // Managers land on the admin area (Manager View / Employee Files) by
+    // default instead of their own onboarding checklist. Fetch the role
+    // right after verifyOtp so we have an authenticated session to query
+    // profiles with.
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    let destination = '/dashboard';
+    if (user) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single();
+      if (profile?.role === 'manager') {
+        destination = '/admin';
+      }
+    }
+
+    router.push(destination);
     router.refresh();
   }
 
