@@ -1,4 +1,4 @@
-import { PDFDocument, StandardFonts, PDFFont, PDFImage, PDFPage } from 'pdf-lib';
+import { PDFDocument, StandardFonts, PDFFont, PDFImage, PDFPage, rgb } from 'pdf-lib';
 import fs from 'fs';
 import path from 'path';
 
@@ -30,6 +30,7 @@ interface DrawTextSpec {
   y: number;
   size?: number;
   bold?: boolean;
+  color?: [number, number, number]; // RGB, each 0-1. Defaults to black.
 }
 
 interface DrawSignatureSpec {
@@ -76,7 +77,13 @@ async function fillOverlayPdf(opts: OverlayOptions): Promise<Uint8Array> {
   for (const t of opts.texts ?? []) {
     const p = pages[t.page];
     if (!p) continue;
-    p.drawText(t.value, { x: t.x, y: t.y, size: t.size ?? 10, font: t.bold ? boldFont : font });
+    p.drawText(t.value, {
+      x: t.x,
+      y: t.y,
+      size: t.size ?? 10,
+      font: t.bold ? boldFont : font,
+      color: t.color ? rgb(t.color[0], t.color[1], t.color[2]) : undefined,
+    });
   }
 
   if (opts.signature) {
@@ -144,10 +151,10 @@ export async function fillJobExposurePdf({ employeeName, exposureCategory, signa
     sourceFile: '07-job-exposure-classification.pdf',
     texts: [
       { page: 0, x: 200, y: 563, value: employeeName, size: 14 },
-      { page: 0, x: 72, y: 535, value: `**Selected: ${exposureCategory}`, size: 11, bold: true },
-      { page: 0, x: 439, y: 150, value: submittedAt.toLocaleDateString('en-US'), size: 13 },
+      { page: 0, x: 72, y: 535, value: `**Selected: ${exposureCategory}`, size: 11, bold: true, color: [0.85, 0, 0] },
+      { page: 0, x: 435, y: 150, value: submittedAt.toLocaleDateString('en-US'), size: 13 },
     ],
-    signature: { page: 0, x: 218, y: 139, dataUrl: signatureDataUrl, maxWidth: 223, maxHeight: 46 },
+    signature: { page: 0, x: 210, y: 139, dataUrl: signatureDataUrl, maxWidth: 223, maxHeight: 46 },
   });
 }
 
