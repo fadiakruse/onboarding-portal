@@ -152,6 +152,7 @@ export async function POST(request: Request) {
         form, answers: printableAnswers,
         employeeName: fullNameFromForm1,
         signatureDataUrl: signature || '', practiceName, submittedAt: new Date(),
+        fileAttachments: rawUploadedFiles,
       });
 
       // Item 10 — Medicare Attestation: fold the uploaded training

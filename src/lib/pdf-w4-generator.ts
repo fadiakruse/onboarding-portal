@@ -121,7 +121,7 @@ export async function generateW4Pdf({ answers, signatureDataUrl, submittedAt, hi
       const base64 = signatureDataUrl.split(',')[1];
       const pngBytes = Buffer.from(base64, 'base64');
       const pngImage = await pdfDoc.embedPng(pngBytes);
-      const sigHeight = 60; // 3x the original 20
+      const sigHeight = 30; // reduced 50% from the previous 60 (originally 20)
       const sigWidth = (pngImage.width / pngImage.height) * sigHeight;
       page.drawImage(pngImage, { x: 95, y: signatureY, width: sigWidth, height: sigHeight });
     } catch (err) {

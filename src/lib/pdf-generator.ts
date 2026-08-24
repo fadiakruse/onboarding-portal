@@ -13,6 +13,12 @@ interface GeneratePdfOptions {
   signatureDataUrl: string;
   practiceName: string;
   submittedAt: Date;
+  // Raw uploaded files, keyed by field id (e.g. "checkImage"). When present
+  // and the mimeType is an image, the actual image is embedded into the PDF
+  // in place of that field's usual "Uploaded: <filename>" text line. Non-
+  // image uploads (e.g. a PDF scan) still fall back to the filename text,
+  // since embedding a PDF's pages inline here would need a different flow.
+  fileAttachments?: Record<string, { dataUrl: string; mimeType: string }>;
 }
 
 function wrapText(text: string, font: PDFFont, size: number, maxWidth: number): string[] {
@@ -33,7 +39,7 @@ function wrapText(text: string, font: PDFFont, size: number, maxWidth: number): 
 }
 
 export async function generateFormPdf(opts: GeneratePdfOptions): Promise<Uint8Array> {
-  const { form, answers, employeeName, signatureDataUrl, practiceName, submittedAt } = opts;
+  const { form, answers, employeeName, signatureDataUrl, practiceName, submittedAt, fileAttachments } = opts;
 
   const pdfDoc = await PDFDocument.create();
   const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
@@ -76,12 +82,44 @@ export async function generateFormPdf(opts: GeneratePdfOptions): Promise<Uint8Ar
     const rawValue = answers[field.id];
     if (rawValue === undefined || rawValue === null || rawValue === '') continue;
 
-    const value = Array.isArray(rawValue) ? rawValue.join(', ') : String(rawValue);
+    const attachment = field.type === 'fileUpload' ? fileAttachments?.[field.id] : undefined;
+    const isImageAttachment = attachment?.mimeType?.startsWith('image/');
 
     newPageIfNeeded(30);
     page.drawText(field.label, { x: PAGE_MARGIN, y, size: 9, font: boldFont, color: rgb(0.35, 0.35, 0.35) });
     y -= 13;
 
+    if (isImageAttachment) {
+      // Embed the actual uploaded image (e.g. the voided check) instead of
+      // just printing "Uploaded: <filename>".
+      try {
+        const base64 = attachment!.dataUrl.split(',')[1];
+        const bytes = Uint8Array.from(Buffer.from(base64, 'base64'));
+        const isPng = attachment!.mimeType === 'image/png';
+        const image = isPng ? await pdfDoc.embedPng(bytes) : await pdfDoc.embedJpg(bytes);
+        const maxImgWidth = CONTENT_WIDTH;
+        const maxImgHeight = 260;
+        const scale = Math.min(maxImgWidth / image.width, maxImgHeight / image.height, 1);
+        const w = image.width * scale;
+        const h = image.height * scale;
+        newPageIfNeeded(h + 10);
+        page.drawImage(image, { x: PAGE_MARGIN, y: y - h, width: w, height: h });
+        y -= h + 8;
+      } catch (err) {
+        console.error(`Could not embed uploaded image for ${field.id}`, err);
+        const value = String(rawValue);
+        const valueLines = wrapText(value, font, 11, CONTENT_WIDTH);
+        for (const line of valueLines) {
+          newPageIfNeeded(16);
+          page.drawText(line, { x: PAGE_MARGIN, y, size: 11, font });
+          y -= 15;
+        }
+        y -= 8;
+      }
+      continue;
+    }
+
+    const value = Array.isArray(rawValue) ? rawValue.join(', ') : String(rawValue);
     const valueLines = wrapText(value, font, 11, CONTENT_WIDTH);
     for (const line of valueLines) {
       newPageIfNeeded(16);

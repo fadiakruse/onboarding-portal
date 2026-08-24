@@ -120,7 +120,7 @@ export async function fillHipaaCompliancePdf({ signatureDataUrl, submittedAt }: 
     texts: [
       { page: 0, x: 90, y: 97, value: submittedAt.toLocaleDateString('en-US'), size: 10 },
     ],
-    signature: { page: 0, x: 72, y: 142, dataUrl: signatureDataUrl, maxWidth: 198, maxHeight: 50 },
+    signature: { page: 0, x: 72, y: 144, dataUrl: signatureDataUrl, maxWidth: 198, maxHeight: 50 },
   });
 }
 
@@ -144,10 +144,10 @@ export async function fillJobExposurePdf({ employeeName, exposureCategory, signa
     sourceFile: '07-job-exposure-classification.pdf',
     texts: [
       { page: 0, x: 200, y: 563, value: employeeName, size: 14 },
-      { page: 0, x: 72, y: 535, value: `Selected: ${exposureCategory}`, size: 11, bold: true },
-      { page: 0, x: 441, y: 150, value: submittedAt.toLocaleDateString('en-US'), size: 13 },
+      { page: 0, x: 72, y: 535, value: `**Selected: ${exposureCategory}`, size: 11, bold: true },
+      { page: 0, x: 439, y: 150, value: submittedAt.toLocaleDateString('en-US'), size: 13 },
     ],
-    signature: { page: 0, x: 222, y: 139, dataUrl: signatureDataUrl, maxWidth: 223, maxHeight: 46 },
+    signature: { page: 0, x: 218, y: 139, dataUrl: signatureDataUrl, maxWidth: 223, maxHeight: 46 },
   });
 }
 
