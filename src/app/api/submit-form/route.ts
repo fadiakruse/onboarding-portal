@@ -10,11 +10,6 @@ import {
   fillHipaaCompliancePdf,
   fillJobExposurePdf,
   fillTmgnjConfidentialityPdf,
-  fillCepaPdf,
-  fillMedicareAttestationPdf,
-  fillHepBVaccinationPdf,
-  fillHumanTraffickingPdf,
-  fillEmployeeManualPdf,
   appendCertificateToPdf,
 } from '@/lib/pdf-overlay-generator';
 
@@ -161,44 +156,6 @@ export async function POST(request: Request) {
         signatureDataUrl: signature,
         submittedAt: new Date(),
       });
-    } else if (form.id === '09-cepa-acknowledgment') {
-      pdfBytes = await fillCepaPdf({
-        printName: printableAnswers.cepaPrintName || fullNameFromForm1,
-        signatureDataUrl: signature,
-        submittedAt: new Date(),
-      });
-    } else if (form.id === '10-medicare-attestation') {
-      pdfBytes = await fillMedicareAttestationPdf({
-        employeeName: printableAnswers.medicarePrintName || fullNameFromForm1,
-        signatureDataUrl: signature,
-        submittedAt: new Date(),
-      });
-      // Fold the uploaded training certificate in as additional page(s) on
-      // top of the now-filled Medicare Attestation PDF (previously this
-      // appended onto the generic summary PDF instead of the real form).
-      if (rawUploadedFiles.trainingCertificate) {
-        pdfBytes = await appendCertificateToPdf(pdfBytes, rawUploadedFiles.trainingCertificate);
-      }
-    } else if (form.id === '11-hep-b-vaccination') {
-      pdfBytes = await fillHepBVaccinationPdf({
-        employeeName: fullNameFromForm1,
-        choice: printableAnswers.hepBChoice || '',
-        notes: printableAnswers.hepBNotes || '',
-        signatureDataUrl: signature,
-        submittedAt: new Date(),
-      });
-    } else if (form.id === '12-human-trafficking-awareness') {
-      pdfBytes = await fillHumanTraffickingPdf({
-        reviewDate: printableAnswers.reviewDate || '',
-        signatureDataUrl: signature,
-        submittedAt: new Date(),
-      });
-    } else if (form.id === '13-employee-manual-acknowledgement') {
-      pdfBytes = await fillEmployeeManualPdf({
-        printName: printableAnswers.manualPrintName || fullNameFromForm1,
-        signatureDataUrl: signature,
-        submittedAt: new Date(),
-      });
     } else {
       pdfBytes = await generateFormPdf({
         form, answers: printableAnswers,
@@ -206,6 +163,12 @@ export async function POST(request: Request) {
         signatureDataUrl: signature || '', practiceName, submittedAt: new Date(),
         fileAttachments: rawUploadedFiles,
       });
+
+      // Medicare Attestation: fold the uploaded training certificate in as
+      // additional page(s) on the generated summary PDF.
+      if (form.id === '10-medicare-attestation' && rawUploadedFiles.trainingCertificate) {
+        pdfBytes = await appendCertificateToPdf(pdfBytes, rawUploadedFiles.trainingCertificate);
+      }
     }
   } catch (err) {
     console.error('PDF generation failed', err);
