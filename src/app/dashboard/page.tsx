@@ -37,7 +37,17 @@ export default async function DashboardPage() {
     .order('form_order', { ascending: true });
 
   const statusMap = new Map((statusRows ?? []).map((r) => [r.form_id, r]));
-  const completedCount = (statusRows ?? []).filter((r) => r.status === 'completed').length;
+
+  // Forms get removed/reorganized over time (e.g. W-4/I-9/Direct Deposit were
+  // removed from the flow). If this employee completed any of those before
+  // they were removed, the old 'completed' row is still sitting in
+  // employee_forms — without this filter it would inflate completedCount
+  // past TOTAL_FORMS (e.g. "13 of 10 forms completed" and "allDone" never
+  // becoming true even though every current form is done).
+  const currentFormIds = new Set(FORMS.map((f) => f.id));
+  const completedCount = (statusRows ?? []).filter(
+    (r) => r.status === 'completed' && currentFormIds.has(r.form_id)
+  ).length;
   const allDone = completedCount === TOTAL_FORMS;
 
   const form1 = FORMS[0];

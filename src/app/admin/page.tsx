@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
-import { TOTAL_FORMS } from '@/lib/forms-config';
+import { FORMS, TOTAL_FORMS } from '@/lib/forms-config';
 import DeleteEmployeeButton from '@/components/DeleteEmployeeButton';
 import ResendLinkButton from '@/components/ResendLinkButton';
 import InviteEmployeeButton from '@/components/InviteEmployeeButton';
@@ -31,14 +31,23 @@ export default async function AdminPage() {
     .eq('role', 'manager')
     .order('created_at', { ascending: false });
 
-  const { data: allForms } = await supabase.from('employee_forms').select('employee_id, status');
+  // form_id is now selected too — needed to filter out rows for forms that
+  // no longer exist in the current FORMS list (see currentFormIds below).
+  const { data: allForms } = await supabase.from('employee_forms').select('employee_id, form_id, status');
   const { data: inviteLogRows } = await supabase.from('invite_log').select('email, first_sent_at');
 
   const inviteByEmail = new Map((inviteLogRows ?? []).map((r) => [r.email.toLowerCase(), r.first_sent_at]));
 
+  // Forms get removed/reorganized over time (e.g. W-4/I-9/Direct Deposit were
+  // removed from the flow). Employees who completed those before removal
+  // still have old 'completed' rows for them in employee_forms — without
+  // this filter, those stale rows would inflate the count past TOTAL_FORMS
+  // (e.g. showing "13/10" instead of "10/10").
+  const currentFormIds = new Set(FORMS.map((f) => f.id));
+
   const completionByEmployee = new Map<string, number>();
   for (const row of allForms ?? []) {
-    if (row.status === 'completed') {
+    if (row.status === 'completed' && currentFormIds.has(row.form_id)) {
       completionByEmployee.set(row.employee_id, (completionByEmployee.get(row.employee_id) || 0) + 1);
     }
   }
@@ -103,7 +112,7 @@ export default async function AdminPage() {
                           />
                         )}
                       </div>
-                    </td>                  
+                    </td>
                   </tr>
                 );
               })}

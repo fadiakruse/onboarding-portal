@@ -187,7 +187,109 @@ export async function fillTmgnjConfidentialityPdf({ employeeName, signatureDataU
   return pdfDoc.save();
 }
 
-// Item 10 — Step "10-medicare-attestation", append the employee's uploaded
+// Item — Step "09-cepa-acknowledgment". Short, single-page document ending
+// with a "Employee Signature / Date" line followed by a "Print or type name
+// of employee" line below it. NOTE: no visual render of this document was
+// available when these coordinates were set (text-only extraction) — expect
+// this one may need a visual-check pass, same as the original four overlay
+// documents did.
+export async function fillCepaPdf({ printName, signatureDataUrl, submittedAt }: SimpleSignParams): Promise<Uint8Array> {
+  return fillOverlayPdf({
+    sourceFile: '09-cepa-acknowledgment.pdf',
+    texts: [
+      { page: 0, x: 300, y: 268, value: submittedAt.toLocaleDateString('en-US'), size: 10 },
+      { page: 0, x: 72, y: 228, value: printName, size: 11 },
+    ],
+    signature: { page: 0, x: 72, y: 274, dataUrl: signatureDataUrl, maxWidth: 200, maxHeight: 40 },
+  });
+}
+
+interface MedicareParams {
+  employeeName: string;
+  signatureDataUrl: string | null | undefined;
+  submittedAt: Date;
+}
+
+// Item — Step "10-medicare-attestation". Source has three separate blank
+// lines stacked vertically: Employee Signature, then Employee Name, then
+// Date — matched against the visual layout in the uploaded template.
+export async function fillMedicareAttestationPdf({ employeeName, signatureDataUrl, submittedAt }: MedicareParams): Promise<Uint8Array> {
+  return fillOverlayPdf({
+    sourceFile: '10-medicare-attestation.pdf',
+    texts: [
+      { page: 0, x: 72, y: 393, value: employeeName, size: 11 },
+      { page: 0, x: 72, y: 336, value: submittedAt.toLocaleDateString('en-US'), size: 10 },
+    ],
+    signature: { page: 0, x: 72, y: 462, dataUrl: signatureDataUrl, maxWidth: 200, maxHeight: 40 },
+  });
+}
+
+interface HepBParams {
+  employeeName: string;
+  choice: string;
+  notes?: string;
+  signatureDataUrl: string | null | undefined;
+  submittedAt: Date;
+}
+
+// Item — Step "11-hep-b-vaccination". Dense form with a checkbox list this
+// app doesn't try to tick directly (same reasoning as Job Exposure) — instead
+// stamps which option was selected, in red, above the checkbox list. Name/
+// Date/Signature go on the NAME / DATE / SIGNATURE row near the bottom.
+export async function fillHepBVaccinationPdf({ employeeName, choice, notes, signatureDataUrl, submittedAt }: HepBParams): Promise<Uint8Array> {
+  const texts: Array<{ page: number; x: number; y: number; value: string; size?: number; bold?: boolean; color?: [number, number, number] }> = [
+    { page: 0, x: 72, y: 560, value: `Selected: ${choice}`, size: 9, bold: true, color: [0.85, 0, 0] },
+    { page: 0, x: 90, y: 273, value: employeeName, size: 10 },
+    { page: 0, x: 400, y: 273, value: submittedAt.toLocaleDateString('en-US'), size: 10 },
+  ];
+  if (notes) {
+    texts.push({ page: 0, x: 140, y: 108, value: notes, size: 9 });
+  }
+  return fillOverlayPdf({
+    sourceFile: '11-hep-b-vaccination.pdf',
+    texts,
+    signature: { page: 0, x: 90, y: 250, dataUrl: signatureDataUrl, maxWidth: 170, maxHeight: 30 },
+  });
+}
+
+interface HumanTraffickingParams {
+  reviewDate: string; // already a plain string like "8/21/2026" or the raw form value
+  signatureDataUrl: string | null | undefined;
+  submittedAt: Date;
+}
+
+// Item — Step "12-human-trafficking-awareness". Short single-page
+// acknowledgment. Two dates appear in the source: the "on ___/___/____" the
+// training was reviewed, and the final "Employee Signature / Date" line.
+// NOTE: text-only source, no visual render available — likely needs one
+// visual-check pass like CEPA/Employee Manual below.
+export async function fillHumanTraffickingPdf({ reviewDate, signatureDataUrl, submittedAt }: HumanTraffickingParams): Promise<Uint8Array> {
+  return fillOverlayPdf({
+    sourceFile: '12-human-trafficking-awareness.pdf',
+    texts: [
+      { page: 0, x: 300, y: 470, value: reviewDate, size: 10 },
+      { page: 0, x: 300, y: 400, value: submittedAt.toLocaleDateString('en-US'), size: 10 },
+    ],
+    signature: { page: 0, x: 72, y: 406, dataUrl: signatureDataUrl, maxWidth: 200, maxHeight: 40 },
+  });
+}
+
+// Item — Step "13-employee-manual-acknowledgement". Longer document; the
+// signature block sits near the bottom after several paragraphs. NOTE:
+// text-only source, no visual render available — likely needs one
+// visual-check pass like CEPA/Human Trafficking above.
+export async function fillEmployeeManualPdf({ printName, signatureDataUrl, submittedAt }: SimpleSignParams): Promise<Uint8Array> {
+  return fillOverlayPdf({
+    sourceFile: '13-employee-manual-acknowledgement.pdf',
+    texts: [
+      { page: 0, x: 300, y: 178, value: submittedAt.toLocaleDateString('en-US'), size: 10 },
+      { page: 0, x: 72, y: 138, value: printName, size: 11 },
+    ],
+    signature: { page: 0, x: 72, y: 184, dataUrl: signatureDataUrl, maxWidth: 200, maxHeight: 40 },
+  });
+}
+
+
 // training-completion certificate as additional page(s) onto the generated
 // Medicare Attestation PDF, instead of (or in addition to) storing it as a
 // separate file. Handles both a PDF certificate (pages copied in directly)
