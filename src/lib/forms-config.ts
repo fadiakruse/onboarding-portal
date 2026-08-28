@@ -103,7 +103,7 @@ intro: ['This acknowledges that you have received notice of your rights under th
 fields: [{ id: 'cepaPrintName', label: 'Print Name', type: 'text', required: true, autofillKey: 'fullName' }], requiresSignature: true },
 { id: '10-medicare-attestation', order: 7, title: 'Medicare Compliance Attestation', shortTitle: 'Medicare Attestation',
 linkText: 'Complete the Medicare Parts C & D Fraud, Waste & Abuse Training (upload your certificate below upon completion)', linkUrl: 'https://www.cms.gov/Outreach-and-Education/MLN/WBT/MLN3995723-MLNPartsCD/FWA/story.html',
-intro: ['I have reviewed the training materials concerning Medicare Parts C and D Compliance and Combating Medicare Parts C and D Fraud, Waste, and Abuse, as well as the Medicare Compliance Policies and Code of Conduct.'],
+intro: ['I have reviewed the training materials Combating Medicare Parts C and D Fraud, Waste, and Abuse, as well as the Medicare Compliance Policies and Code of Conduct.'],
 fields: [
 { id: 'medicarePrintName', label: 'Employee Name', type: 'text', required: true, autofillKey: 'fullName' },
 { id: 'trainingCertificate', label: 'Upload Training Completion Certificate', type: 'fileUpload', accept: 'image/*,application/pdf', required: true },

@@ -50,13 +50,15 @@ export async function generateEmployeeDataPdf(opts: GenerateEmployeeDataPdfOptio
 
   let y = PAGE_HEIGHT - PAGE_MARGIN;
 
+  const navyBlue = rgb(0, 0, 0.5);
+
   // Header
-  page.drawText(practiceName, { x: PAGE_MARGIN, y, size: 9, font: boldFont, color: rgb(0.2, 0.2, 0.2) });
-  y -= 18;
-  page.drawText('Employee Data Form', { x: PAGE_MARGIN, y, size: 14, font: boldFont });
-  y -= 8;
+  page.drawText(practiceName, { x: PAGE_MARGIN, y, size: 12, font: boldFont, color: rgb(0.2, 0.2, 0.2) });
+  y -= 20;
+  page.drawText('Employee Data Form', { x: PAGE_MARGIN, y, size: 16, font: boldFont });
+  y -= 9;
   page.drawLine({ start: { x: PAGE_MARGIN, y }, end: { x: PAGE_WIDTH - PAGE_MARGIN, y }, thickness: 1, color: rgb(0.8, 0.8, 0.8) });
-  y -= 16;
+  y -= 18;
 
   const val = (id: string): string => {
     const v = answers[id];
@@ -64,13 +66,17 @@ export async function generateEmployeeDataPdf(opts: GenerateEmployeeDataPdfOptio
     return String(v);
   };
 
-  const labelSize = 7.5;
-  const valueSize = 10;
+  const labelSize = 10.5;
+  const valueSize = 13;
   const labelColor = rgb(0.4, 0.4, 0.4);
+  const labelToValueGap = 14;
+  const lineHeight = 16;
 
   // Draws one row of 1-3 cells sharing the row's width evenly (minus gaps),
   // each with a small caps label above the value, and advances `y` past the
-  // tallest cell in the row (accounting for value text wrapping).
+  // tallest cell in the row (accounting for value text wrapping). Values are
+  // the employee's entered data, so they're drawn in navy blue; labels stay
+  // gray.
   function drawRow(cells: Cell[], gap = 14) {
     const n = cells.length;
     const colWidth = (CONTENT_WIDTH - gap * (n - 1)) / n;
@@ -86,15 +92,15 @@ export async function generateEmployeeDataPdf(opts: GenerateEmployeeDataPdfOptio
 
     cells.forEach((cell, i) => {
       page.drawText(cell.label.toUpperCase(), { x, y, size: labelSize, font: boldFont, color: labelColor });
-      let vy = y - 11;
+      let vy = y - labelToValueGap;
       wrappedPerCell[i].forEach((line) => {
-        page.drawText(line, { x, y: vy, size: valueSize, font });
-        vy -= 12;
+        page.drawText(line, { x, y: vy, size: valueSize, font, color: navyBlue });
+        vy -= lineHeight;
       });
       x += colWidth + gap;
     });
 
-    y -= 11 + maxLines * 12 + 9;
+    y -= labelToValueGap + maxLines * lineHeight + 9;
   }
 
   // Row 1: First / Last name
@@ -170,9 +176,9 @@ export async function generateEmployeeDataPdf(opts: GenerateEmployeeDataPdfOptio
   y -= 6;
   const disclaimer =
     'This Employee Data Form does not constitute, imply, or create either an employment agreement or any terms of employment. All employment is considered "at will."';
-  wrapText(disclaimer, font, 8.5, CONTENT_WIDTH).forEach((line) => {
-    page.drawText(line, { x: PAGE_MARGIN, y, size: 8.5, font, color: rgb(0.45, 0.45, 0.45) });
-    y -= 11;
+  wrapText(disclaimer, font, 11.5, CONTENT_WIDTH).forEach((line) => {
+    page.drawText(line, { x: PAGE_MARGIN, y, size: 11.5, font, color: rgb(0.45, 0.45, 0.45) });
+    y -= 14;
   });
 
   // Signature block
@@ -180,7 +186,7 @@ export async function generateEmployeeDataPdf(opts: GenerateEmployeeDataPdfOptio
   page.drawLine({ start: { x: PAGE_MARGIN, y }, end: { x: PAGE_WIDTH - PAGE_MARGIN, y }, thickness: 1, color: rgb(0.85, 0.85, 0.85) });
   y -= 18;
 
-  page.drawText('Employee Signature', { x: PAGE_MARGIN, y, size: 8.5, font: boldFont, color: rgb(0.35, 0.35, 0.35) });
+  page.drawText('Employee Signature', { x: PAGE_MARGIN, y, size: 11.5, font: boldFont, color: rgb(0.35, 0.35, 0.35) });
   y -= 6;
 
   if (signatureDataUrl?.startsWith('data:image/png')) {
@@ -201,9 +207,9 @@ export async function generateEmployeeDataPdf(opts: GenerateEmployeeDataPdfOptio
   page.drawLine({ start: { x: PAGE_MARGIN, y }, end: { x: PAGE_MARGIN + 200, y }, thickness: 0.75, color: rgb(0.5, 0.5, 0.5) });
   y -= 14;
 
-  page.drawText(`Signed by: ${employeeName}`, { x: PAGE_MARGIN, y, size: 9.5, font });
-  y -= 13;
-  page.drawText(`Date: ${submittedAt.toLocaleDateString('en-US')}`, { x: PAGE_MARGIN, y, size: 9.5, font });
+  page.drawText(`Signed by: ${employeeName}`, { x: PAGE_MARGIN, y, size: 12.5, font, color: navyBlue });
+  y -= 15;
+  page.drawText(`Date: ${submittedAt.toLocaleDateString('en-US')}`, { x: PAGE_MARGIN, y, size: 12.5, font, color: navyBlue });
 
   return pdfDoc.save();
 }
