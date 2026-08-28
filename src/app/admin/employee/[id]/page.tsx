@@ -2,6 +2,7 @@ import { redirect, notFound } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
 import { FORMS } from '@/lib/forms-config';
+import { sanitizeFolderSegment } from '@/lib/formatters';
 import ReviewFormButtons from '@/components/ReviewFormButtons';
 import MarkAllCompleteButton from '@/components/MarkAllCompleteButton';
 
@@ -29,6 +30,13 @@ export default async function EmployeeDetailPage({ params }: { params: { id: str
   const employeeDisplayName =
     [employee.first_name, employee.last_name].filter(Boolean).join(' ') || employee.full_name || employee.email;
 
+  // Same folder convention used when forms are generated/saved in
+  // submit-form/route.ts: "Employee Files/{Last}, {First}/Onboarding Forms".
+  const folderLast = sanitizeFolderSegment(employee.last_name || '') || 'Employee';
+  const folderFirst = sanitizeFolderSegment(employee.first_name || '') || 'Unknown';
+  const onboardingFormsPath = `Employee Files/${folderLast}, ${folderFirst}/Onboarding Forms`;
+  const zipDownloadHref = `/api/admin/storage/download-zip?path=${encodeURIComponent(onboardingFormsPath)}&filename=${encodeURIComponent(`${employeeDisplayName} - Onboarding Forms`)}`;
+
   const { data: formRows } = await supabase
     .from('employee_forms')
     .select('form_id, status, pdf_path, completed_at, review_status, review_comment, manager_marked_complete')
@@ -53,7 +61,15 @@ export default async function EmployeeDetailPage({ params }: { params: { id: str
         <Link href="/admin" className="text-xs text-gray-400 hover:text-gray-600">
           ← All employees
         </Link>
-        <MarkAllCompleteButton employeeId={employee.id} employeeLabel={employeeDisplayName} />
+        <div className="flex items-center gap-2">
+          <a
+            href={zipDownloadHref}
+            className="rounded-md border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
+          >
+            Download all forms (ZIP)
+          </a>
+          <MarkAllCompleteButton employeeId={employee.id} employeeLabel={employeeDisplayName} />
+        </div>
       </div>
 
       <h1 className="mt-3 text-xl font-semibold text-gray-900">{employeeDisplayName}</h1>

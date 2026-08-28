@@ -52,7 +52,17 @@ export async function GET(request: NextRequest) {
   }
 
   const zipBytes = await zip.generateAsync({ type: 'uint8array' });
+
+  // Optional override so callers (e.g. the employee detail page's "Download
+  // all forms" button) can name the zip after something more meaningful than
+  // the raw folder name — e.g. the employee's name instead of "Onboarding
+  // Forms". Falls back to the previous folder-name behavior when omitted, so
+  // every existing caller of this route is unaffected.
+  const filenameParam = request.nextUrl.searchParams.get('filename');
   const folderName = path.split('/').filter(Boolean).pop() || 'download';
+  const rawFilename = filenameParam || folderName;
+  // Strip characters that aren't safe in a filename / Content-Disposition value.
+  const safeFilename = rawFilename.replace(/[\\/:*?"<>|]/g, '').trim() || 'download';
 
   // The type assertion here works around a known TypeScript typing mismatch
   // between @types/node's Uint8Array/Buffer generics and the DOM BodyInit
@@ -62,7 +72,7 @@ export async function GET(request: NextRequest) {
     status: 200,
     headers: {
       'Content-Type': 'application/zip',
-      'Content-Disposition': `attachment; filename="${folderName}.zip"`,
+      'Content-Disposition': `attachment; filename="${safeFilename}.zip"`,
     },
   });
 }
