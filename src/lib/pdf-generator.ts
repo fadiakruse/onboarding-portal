@@ -85,8 +85,16 @@ export async function generateFormPdf(opts: GeneratePdfOptions): Promise<Uint8Ar
     const attachment = field.type === 'fileUpload' ? fileAttachments?.[field.id] : undefined;
     const isImageAttachment = attachment?.mimeType?.startsWith('image/');
 
+    // Only the Hep B Vaccination form's "Your Choice" field gets highlighted
+    // in red on the generated PDF — every other field, on every other form
+    // sharing this generic generator, keeps its normal label/value colors.
+    const isHepBChoiceField = form.id === '11-hep-b-vaccination' && field.id === 'hepBChoice';
+    const red = rgb(0.85, 0, 0);
+    const labelColor = isHepBChoiceField ? red : rgb(0.35, 0.35, 0.35);
+    const valueColor = isHepBChoiceField ? red : undefined;
+
     newPageIfNeeded(30);
-    page.drawText(field.label, { x: PAGE_MARGIN, y, size: 9, font: boldFont, color: rgb(0.35, 0.35, 0.35) });
+    page.drawText(field.label, { x: PAGE_MARGIN, y, size: 9, font: boldFont, color: labelColor });
     y -= 13;
 
     if (isImageAttachment) {
@@ -123,7 +131,7 @@ export async function generateFormPdf(opts: GeneratePdfOptions): Promise<Uint8Ar
     const valueLines = wrapText(value, font, 11, CONTENT_WIDTH);
     for (const line of valueLines) {
       newPageIfNeeded(16);
-      page.drawText(line, { x: PAGE_MARGIN, y, size: 11, font });
+      page.drawText(line, { x: PAGE_MARGIN, y, size: 11, font, color: valueColor });
       y -= 15;
     }
     y -= 8;
