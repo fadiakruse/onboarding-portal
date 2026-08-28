@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { FORMS, getFormById } from '@/lib/forms-config';
 import { generateFormPdf } from '@/lib/pdf-generator';
+import { generateEmployeeDataPdf } from '@/lib/pdf-employee-data-generator';
 import { sanitizeFolderSegment } from '@/lib/formatters';
 import { generateW4Pdf } from '@/lib/pdf-w4-generator';
 import {
@@ -116,7 +117,15 @@ export async function POST(request: Request) {
 
   let pdfBytes: Uint8Array;
   try {
-    if (form.id === '02-w4-2026') {
+    if (form.id === '01-employee-data-form') {
+      pdfBytes = await generateEmployeeDataPdf({
+        answers: printableAnswers,
+        employeeName: fullNameFromForm1,
+        signatureDataUrl: signature || '',
+        practiceName,
+        submittedAt: new Date(),
+      });
+    } else if (form.id === '02-w4-2026') {
       pdfBytes = await generateW4Pdf({
         answers: printableAnswers,
         signatureDataUrl: signature || '',
