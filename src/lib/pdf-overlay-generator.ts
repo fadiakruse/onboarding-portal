@@ -106,7 +106,7 @@ interface SimpleSignParams {
 // itself (moved right past the label, onto the blank line).
 export async function fillHipaaConfidentialityPdf({ printName, signatureDataUrl, submittedAt }: SimpleSignParams): Promise<Uint8Array> {
   return fillOverlayPdf({
-    sourceFile: '05-hipaa-confidentiality.pdf',
+    sourceFile: '02 - HIPAA Confidentiality.pdf',
     texts: [
       { page: 0, x: 455, y: 108, value: submittedAt.toLocaleDateString('en-US'), size: 12 },
       { page: 0, x: 140, y: 76, value: printName, size: 13 },
@@ -123,7 +123,7 @@ export async function fillHipaaConfidentialityPdf({ printName, signatureDataUrl,
 // up so it sits cleanly on the blank line above the label.
 export async function fillHipaaCompliancePdf({ signatureDataUrl, submittedAt }: Omit<SimpleSignParams, 'printName'>): Promise<Uint8Array> {
   return fillOverlayPdf({
-    sourceFile: '06-hipaa-compliance-form.pdf',
+    sourceFile: '03 - HIPAA Compliance Form.pdf',
     texts: [
       { page: 0, x: 90, y: 97, value: submittedAt.toLocaleDateString('en-US'), size: 10 },
     ],
@@ -148,7 +148,7 @@ interface JobExposureParams {
 // only the name itself was relocated, since that's the field it belongs in.
 export async function fillJobExposurePdf({ employeeName, exposureCategory, signatureDataUrl, submittedAt }: JobExposureParams): Promise<Uint8Array> {
   return fillOverlayPdf({
-    sourceFile: '07-job-exposure-classification.pdf',
+    sourceFile: '04 - Job Exposure Classification.pdf',
     texts: [
       { page: 0, x: 200, y: 563, value: employeeName, size: 14 },
       { page: 0, x: 72, y: 535, value: `**Selected: ${exposureCategory}`, size: 11, bold: true, color: [0.85, 0, 0] },
@@ -168,7 +168,7 @@ export async function fillJobExposurePdf({ employeeName, exposureCategory, signa
 // moved up to the actual "Employee Name: ____" blank near the top of the
 // page, right after the title.
 export async function fillTmgnjConfidentialityPdf({ employeeName, signatureDataUrl, submittedAt }: { employeeName: string; signatureDataUrl: string | null | undefined; submittedAt: Date }): Promise<Uint8Array> {
-  const templateBytes = loadSourceBytes('08-tmgnj-confidentiality-agreement.pdf');
+  const templateBytes = loadSourceBytes('05 - TMGNJ Confidentiality Agreement.pdf');
   const pdfDoc = await PDFDocument.load(templateBytes);
   const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
   const pages = pdfDoc.getPages();
@@ -195,7 +195,7 @@ export async function fillTmgnjConfidentialityPdf({ employeeName, signatureDataU
 // documents did.
 export async function fillCepaPdf({ printName, signatureDataUrl, submittedAt }: SimpleSignParams): Promise<Uint8Array> {
   return fillOverlayPdf({
-    sourceFile: '09-cepa-acknowledgment.pdf',
+    sourceFile: '06 - CEPA Acknowledgment.pdf',
     texts: [
       { page: 0, x: 300, y: 268, value: submittedAt.toLocaleDateString('en-US'), size: 10 },
       { page: 0, x: 72, y: 228, value: printName, size: 11 },
@@ -215,7 +215,7 @@ interface MedicareParams {
 // Date — matched against the visual layout in the uploaded template.
 export async function fillMedicareAttestationPdf({ employeeName, signatureDataUrl, submittedAt }: MedicareParams): Promise<Uint8Array> {
   return fillOverlayPdf({
-    sourceFile: '10-medicare-attestation.pdf',
+    sourceFile: '07 - Medicare Attestation.pdf',
     texts: [
       { page: 0, x: 72, y: 393, value: employeeName, size: 11 },
       { page: 0, x: 72, y: 336, value: submittedAt.toLocaleDateString('en-US'), size: 10 },
@@ -246,7 +246,7 @@ export async function fillHepBVaccinationPdf({ employeeName, choice, notes, sign
     texts.push({ page: 0, x: 140, y: 108, value: notes, size: 9 });
   }
   return fillOverlayPdf({
-    sourceFile: '11-hep-b-vaccination.pdf',
+    sourceFile: '08 - Hep B Vaccination Record.pdf',
     texts,
     signature: { page: 0, x: 90, y: 250, dataUrl: signatureDataUrl, maxWidth: 170, maxHeight: 30 },
   });
@@ -265,7 +265,7 @@ interface HumanTraffickingParams {
 // visual-check pass like CEPA/Employee Manual below.
 export async function fillHumanTraffickingPdf({ reviewDate, signatureDataUrl, submittedAt }: HumanTraffickingParams): Promise<Uint8Array> {
   return fillOverlayPdf({
-    sourceFile: '12-human-trafficking-awareness.pdf',
+    sourceFile: '09 - Human Trafficking Awareness Acknowledgment.pdf',
     texts: [
       { page: 0, x: 300, y: 470, value: reviewDate, size: 10 },
       { page: 0, x: 300, y: 400, value: submittedAt.toLocaleDateString('en-US'), size: 10 },
@@ -280,7 +280,7 @@ export async function fillHumanTraffickingPdf({ reviewDate, signatureDataUrl, su
 // visual-check pass like CEPA/Human Trafficking above.
 export async function fillEmployeeManualPdf({ printName, signatureDataUrl, submittedAt }: SimpleSignParams): Promise<Uint8Array> {
   return fillOverlayPdf({
-    sourceFile: '13-employee-manual-acknowledgement.pdf',
+    sourceFile: '10 - Employee Manual Acknowledgement.pdf',
     texts: [
       { page: 0, x: 300, y: 178, value: submittedAt.toLocaleDateString('en-US'), size: 10 },
       { page: 0, x: 72, y: 138, value: printName, size: 11 },
@@ -290,6 +290,7 @@ export async function fillEmployeeManualPdf({ printName, signatureDataUrl, submi
 }
 
 
+// Item 10 — Step "10-medicare-attestation", append the employee's uploaded
 // training-completion certificate as additional page(s) onto the generated
 // Medicare Attestation PDF, instead of (or in addition to) storing it as a
 // separate file. Handles both a PDF certificate (pages copied in directly)
