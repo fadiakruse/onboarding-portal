@@ -104,13 +104,22 @@ export async function POST(request: Request) {
     const base64 = fileValue.dataUrl.split(',')[1];
     if (!base64) continue;
     const bytes = Buffer.from(base64, 'base64');
-    const ext = extFromDataUrl(fileValue.dataUrl) || '';
-    const filePath = `${folderPrefix}/${form.id}-${f.id}${ext}`;
-    const { error: fileUploadError } = await supabase.storage.from('new-hire-forms').upload(filePath, bytes, { upsert: true });
-    if (fileUploadError) {
-      console.error(`Upload failed for ${f.id}`, fileUploadError);
-      return NextResponse.json({ error: `Could not save the uploaded file for "${f.label}": ${fileUploadError.message}` }, { status: 500 });
+
+    // The Medicare Attestation's training certificate gets folded directly
+    // into the generated PDF below (via appendCertificateToPdf) — it isn't
+    // also kept as its own separate file, unlike every other upload field.
+    const skipSeparateFile = form.id === '10-medicare-attestation' && f.id === 'trainingCertificate';
+
+    if (!skipSeparateFile) {
+      const ext = extFromDataUrl(fileValue.dataUrl) || '';
+      const filePath = `${folderPrefix}/${form.id}-${f.id}${ext}`;
+      const { error: fileUploadError } = await supabase.storage.from('new-hire-forms').upload(filePath, bytes, { upsert: true });
+      if (fileUploadError) {
+        console.error(`Upload failed for ${f.id}`, fileUploadError);
+        return NextResponse.json({ error: `Could not save the uploaded file for "${f.label}": ${fileUploadError.message}` }, { status: 500 });
+      }
     }
+
     rawUploadedFiles[f.id] = { dataUrl: fileValue.dataUrl, mimeType: mimeFromDataUrl(fileValue.dataUrl) };
     printableAnswers[f.id] = `Uploaded: ${fileValue.name}`;
   }
