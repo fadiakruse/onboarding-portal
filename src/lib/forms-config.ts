@@ -48,7 +48,7 @@ export interface FormConfig {
 // has its own wording via confirmText above, since it's about the form's
 // accuracy and at-will status rather than "options selected").
 export const DEFAULT_CONFIRM_TEXT =
-  'I confirm that I have read and understand the information provided on this page, and I confirm any selections I have made.';
+  'I confirm that I have read and understand the information provided on this page, and I confirm any selections that I have made.';
 
 export const FORMS: FormConfig[] = [
 { id: '01-employee-data-form', order: 1, title: 'Employee Data Form', shortTitle: 'Employee Data',
