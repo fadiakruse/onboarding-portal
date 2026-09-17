@@ -1,1 +1,1 @@
-export const TESTING_MODE = true;
+export const TESTING_MODE = false;
