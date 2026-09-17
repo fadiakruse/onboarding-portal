@@ -48,7 +48,7 @@ export interface FormConfig {
 // has its own wording via confirmText above, since it's about the form's
 // accuracy and at-will status rather than "options selected").
 export const DEFAULT_CONFIRM_TEXT =
-  'I confirm that I have read and understand the information provided on this page, and I acknowledge the options I have selected are correct.';
+  'I confirm that I have read and understand the information provided on this page, and I confirm any selections I have made.';
 
 export const FORMS: FormConfig[] = [
 { id: '01-employee-data-form', order: 1, title: 'Employee Data Form', shortTitle: 'Employee Data',
@@ -95,7 +95,7 @@ fields: [{ id: 'exposureCategory', label: 'Exposure Category', type: 'radio', op
 requiresSignature: true },
 { id: '08-confidentiality-agreement', order: 5, title: 'Confidentiality Agreement', shortTitle: 'Confidentiality Agreement',
 linkText: 'Review terms of TMGNJ Confidentiality Agreement', linkUrl: '/forms/05%20-%20TMGNJ%20Confidentiality%20Agreement.pdf',
-intro: ['This Confidentiality Agreement governs your access to patient and Practice information during and after your employment. Please read the full agreement linked above before signing.', 'By signing, you agree to keep all Information confidential, use it only in performance of your job duties, and return all materials upon termination of employment.'],
+intro: ['This Confidentiality Agreement governs your access to patient and practice information during and after your employment. Please read the full agreement linked above before signing.', 'By signing, you agree to keep all Information confidential, use it only in performance of your job duties, and return all materials upon termination of employment.'],
 fields: [{ id: 'employeeFullName', label: 'Employee Full Name', type: 'text', required: true, autofillKey: 'fullName' }], requiresSignature: true },
 { id: '09-cepa-acknowledgment', order: 6, title: 'CEPA "Whistleblower Act" Acknowledgment', shortTitle: 'CEPA Acknowledgment',
 linkText: 'Review the Conscientious Employee Protection Act (CEPA)', linkUrl: 'https://navesinkderm.com/wp-content/uploads/2026/07/CEPA-Navesink-Dermatology.pdf',
@@ -117,7 +117,7 @@ fields: [
 ], requiresSignature: true },
 { id: '12-human-trafficking-awareness', order: 9, title: 'Human Trafficking Awareness Acknowledgment', shortTitle: 'Human Trafficking Awareness',
 linkText: 'Review the Human Trafficking Awareness Training', linkUrl: 'https://navesinkderm.com/wp-content/uploads/2026/07/Human-Trafficking-Awareness-Training.pdf',
-intro: ['I reviewed in its entirety the training module titled "Recognizing and Responding to Human Trafficking in a Healthcare Context" (National Human Trafficking Resource Center).'],
+intro: ['I reviewed, in its entirety, the training module titled "Recognizing and Responding to Human Trafficking in a Healthcare Context" (National Human Trafficking Resource Center).'],
 fields: [{ id: 'reviewDate', label: 'Date Training Was Reviewed', type: 'date', required: true, defaultToday: true }], requiresSignature: true },
 { id: '13-employee-manual-acknowledgement', order: 10, title: 'Acknowledgment of Receipt of Employee Manual', shortTitle: 'Employee Manual',
 linkText: 'Review Our Employee Manual', linkUrl: 'https://navesinkderm.com/employees/employee_manual_app.html',
