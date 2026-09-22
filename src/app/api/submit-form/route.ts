@@ -12,13 +12,6 @@ import {
   fillTmgnjConfidentialityPdf,
   appendCertificateToPdf,
 } from '@/lib/pdf-overlay-generator';
-import {
-  fillHipaaConfidentialityPdf,
-  fillHipaaCompliancePdf,
-  fillJobExposurePdf,
-  fillTmgnjConfidentialityPdf,
-  appendCertificateToPdf,
-} from '@/lib/pdf-overlay-generator';
 import { encryptField } from '@/lib/encryption';
 
 
