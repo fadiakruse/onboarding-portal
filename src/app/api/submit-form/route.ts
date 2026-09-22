@@ -12,6 +12,15 @@ import {
   fillTmgnjConfidentialityPdf,
   appendCertificateToPdf,
 } from '@/lib/pdf-overlay-generator';
+import {
+  fillHipaaConfidentialityPdf,
+  fillHipaaCompliancePdf,
+  fillJobExposurePdf,
+  fillTmgnjConfidentialityPdf,
+  appendCertificateToPdf,
+} from '@/lib/pdf-overlay-generator';
+import { encryptField } from '@/lib/encryption';
+
 
 function extFromDataUrl(dataUrl: string): string {
   const match = /^data:([^;]+);base64,/.exec(dataUrl);
@@ -182,6 +191,19 @@ export async function POST(request: Request) {
   } catch (err) {
     console.error('PDF generation failed', err);
     return NextResponse.json({ error: 'Could not generate PDF.' }, { status: 500 });
+  }
+
+  // Encrypt the SSN before it's written to the database. This happens after
+  // PDF generation above, which already used the plaintext value — managers
+  // still see the SSN on the generated PDF, but the copy stored in Supabase
+  // (employee_forms.answers) is encrypted at rest.
+  if (form.id === form1.id && printableAnswers.ssn) {
+    try {
+      printableAnswers.ssn = encryptField(String(printableAnswers.ssn));
+    } catch (err) {
+      console.error('SSN encryption failed', err);
+      return NextResponse.json({ error: 'Could not securely save your information. Please try again or contact your administrator.' }, { status: 500 });
+    }
   }
 
   const path = `${folderPrefix}/${form.id}.pdf`;
