@@ -1,0 +1,3 @@
+[functions.everify]
+# The function does its own auth (invite tokens for employees, Supabase Auth JWT + staff table for employers).
+verify_jwt = false

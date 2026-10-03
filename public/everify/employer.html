@@ -1,0 +1,354 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>E-Verify Dashboard</title><link rel="stylesheet" href="styles.css"><script src="config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script></head>
+<body>
+<header>
+  <h1>E-Verify · Form I-9</h1>
+  <span id="mode" class="pill muted"></span>
+  <nav class="tabs hidden" id="tabs">
+    <button data-tab="cases" class="on">Cases</button><button data-tab="new">New hire</button><button data-tab="admin" id="tabAdmin" class="hidden">Admin</button>
+  </nav>
+  <button class="secondary hidden" id="signout">Sign out</button>
+</header>
+<main>
+  <div id="msg"></div>
+
+  <section id="login" class="card hidden" style="max-width:420px">
+    <h2>Sign in</h2>
+    <label for="loginEmail">Work email</label><input id="loginEmail" type="email" autocomplete="email">
+    <div class="row"><button id="loginBtn">Email me a sign-in link</button></div>
+  </section>
+
+  <section id="v-cases" class="hidden">
+    <div class="card">
+      <div class="row" style="margin:0 0 8px"><h2 style="flex:1;margin:0">Cases</h2>
+        <label class="check" style="margin:0"><input type="checkbox" id="openOnly" checked>Open only</label>
+        <button class="secondary" id="reload">Refresh</button></div>
+      <table><thead><tr><th>Employee</th><th class="hide-sm">Client</th><th>Hire date</th><th>Step</th><th>E-Verify status</th></tr></thead><tbody id="caseRows"></tbody></table>
+    </div>
+    <div id="detail"></div>
+  </section>
+
+  <section id="v-new" class="card hidden" style="max-width:640px">
+    <h2>Start a new hire's I-9</h2>
+    <p class="muted">The employee receives a private one-time link to complete Section 1. You complete Section 2 after examining their documents.</p>
+    <label for="nClient">Client company</label><select id="nClient"></select>
+    <div class="grid">
+      <div><label for="nFirst">First name</label><input id="nFirst"></div>
+      <div><label for="nLast">Last name</label><input id="nLast"></div>
+    </div>
+    <div class="grid">
+      <div><label for="nEmail">Employee personal email</label><input id="nEmail" type="email"></div>
+      <div><label for="nHire">Expected first day (date of hire)</label><input id="nHire" type="date"></div>
+    </div>
+    <label class="check"><input type="checkbox" id="nSend" checked>Email the link to the employee</label>
+    <div class="row"><button id="nGo">Create and send link</button></div>
+    <div id="nOut"></div>
+  </section>
+
+  <section id="v-admin" class="hidden">
+    <div class="card"><h2>Client companies</h2>
+      <table><thead><tr><th>Name</th><th>E-Verify client company ID</th><th>Notify email</th></tr></thead><tbody id="clientRows"></tbody></table>
+      <h3>Add client</h3>
+      <div class="grid"><div><label for="cName">Name</label><input id="cName"></div><div><label for="cId">Client company ID</label><input id="cId" inputmode="numeric"></div><div><label for="cNotify">Status-change email (optional)</label><input id="cNotify" type="email"></div></div>
+      <div class="row"><button id="cGo">Add client</button></div>
+    </div>
+    <div class="card"><h2>E-Verify users</h2>
+      <p class="muted">DHS requires each user to pass the E-Verify knowledge test with 70% or higher before accessing E-Verify. Users without a passing score can sign in but can't run cases.</p>
+      <table><thead><tr><th>Name</th><th>Email</th><th>Training</th><th>Role</th></tr></thead><tbody id="staffRows"></tbody></table>
+      <h3>Add or update user</h3>
+      <div class="grid">
+        <div><label for="sName">Full name</label><input id="sName"></div><div><label for="sEmail">Email</label><input id="sEmail" type="email"></div>
+        <div><label for="sPhone">Phone (10 digits)</label><input id="sPhone"></div><div><label for="sExt">Ext.</label><input id="sExt"></div>
+        <div><label for="sScore">Knowledge test score</label><input id="sScore" type="number" min="0" max="100"></div>
+      </div>
+      <label class="check"><input type="checkbox" id="sAdmin">Administrator</label>
+      <label class="check"><input type="checkbox" id="sActive" checked>Active</label>
+      <div class="row"><button id="sGo">Save user</button></div>
+    </div>
+  </section>
+</main>
+<script>
+const C = window.I9_CONFIG;
+const sb = supabase.createClient(C.SUPABASE_URL, C.SUPABASE_ANON_KEY);
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+let ME = null, CURRENT = null; const REF = {};
+
+function flash(cls, text) { $("msg").innerHTML = text ? `<div class="banner ${cls}">${esc(text)}</div>` : ""; if (text) scrollTo(0, 0); }
+async function api(action, body = {}) {
+  const { data: { session } } = await sb.auth.getSession();
+  const r = await fetch(C.FUNCTION_URL, { method: "POST", headers: { "Content-Type": "application/json", apikey: C.SUPABASE_ANON_KEY, Authorization: `Bearer ${session?.access_token ?? ""}` }, body: JSON.stringify({ action, ...body }) });
+  const j = await r.json().catch(() => ({ error: "Network error" }));
+  if (!r.ok) { const ev = (j.everify_errors || []).map((e) => `${e.attribute_name ? e.attribute_name + ": " : ""}${e.message}`).join(" · "); throw { ...j, error: (j.error || "Error") + (ev && !j.error?.includes(ev) ? ` — ${ev}` : "") }; }
+  return j;
+}
+async function act(btn, fn) { if (btn) btn.disabled = true; flash(); try { return await fn(); } catch (e) { flash("bad", e.error || String(e)); showFieldErrors(e.fields); } finally { if (btn) btn.disabled = false; } }
+function showFieldErrors(fields) { document.querySelectorAll(".err").forEach((n) => n.remove()); for (const [k, m] of Object.entries(fields || {})) { const el = document.querySelector(`[data-f="${k}"]`); if (el) { const n = document.createElement("div"); n.className = "err"; n.textContent = m; el.after(n); } } }
+async function ref(kind, query = {}) { const key = kind + JSON.stringify(query); return REF[key] ??= (await api("staff.reference", { kind, query })).items; }
+const opts = (items, sel, blank = "Select…") => `<option value="">${blank}</option>` + items.map((i) => `<option value="${esc(i.code)}" ${i.code === sel ? "selected" : ""}>${esc(i.name || i.code)}</option>`).join("");
+
+const STEP = { invited: ["Waiting on employee", "muted"], section1_complete: ["Section 2 needed", "warn"], section2_complete: ["Ready to submit", "info"], submitted: ["In E-Verify", "info"], closed: ["Closed", "muted"], void: ["Void", "muted"] };
+function statusPill(c) {
+  if (!c.case_status) return '<span class="muted">—</span>';
+  const s = c.case_status, e = c.eligibility_statement;
+  const cls = e === "EMPLOYMENT_AUTHORIZED" || s === "EMPLOYMENT_AUTHORIZED" ? "ok" : ["FINAL_NONCONFIRMATION", "CLOSE_CASE_AND_RESUBMIT"].includes(s) || e === "NOT_AUTHORIZED_EMPLOYMENT" || e === "NO_ACTION_FNC" ? "bad" : ["PHOTO_MATCH", "SCAN_AND_UPLOAD", "PENDING_REFERRAL", "UNCONFIRMED_DATA", "DRAFT"].includes(s) ? "warn" : s === "CLOSED" ? "muted" : "info";
+  return `<span class="pill ${cls}">${esc(c.case_status_display || s)}</span>${e ? `<div class="muted">${esc(e.replaceAll("_", " ").toLowerCase())}</div>` : ""}`;
+}
+
+// ---------- auth ----------
+async function boot() {
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) { $("login").classList.remove("hidden"); return; }
+  try { ME = await api("staff.me"); } catch (e) { flash("bad", e.error); $("signout").classList.remove("hidden"); return; }
+  $("mode").textContent = ME.mode.toUpperCase(); $("mode").className = "pill " + (ME.mode === "production" ? "ok" : "warn");
+  $("tabs").classList.remove("hidden"); $("signout").classList.remove("hidden");
+  if (ME.staff.is_admin) $("tabAdmin").classList.remove("hidden");
+  if (!ME.staff.training_passed_at) flash("warn", "Your E-Verify training is not recorded yet. An administrator must enter your passing knowledge-test score before you can run cases.");
+  else if (ME.password_expiration_date && (new Date(ME.password_expiration_date) - Date.now()) < 14 * 864e5) flash("warn", `The E-Verify web services password expires ${ME.password_expiration_date}. Update it in E-Verify and in the function secrets.`);
+  else if (ME.mode === "mock") flash("info", "MOCK mode: nothing is sent to E-Verify. Last names containing photo / mismatch / confirm / queue / dupe simulate those outcomes.");
+  show("cases");
+}
+$("loginBtn").onclick = () => act($("loginBtn"), async () => {
+  const { error } = await sb.auth.signInWithOtp({ email: $("loginEmail").value.trim(), options: { emailRedirectTo: location.href.split("#")[0], shouldCreateUser: false } });
+  if (error) throw { error: error.message }; flash("ok", "Check your email for the sign-in link.");
+});
+$("signout").onclick = async () => { await sb.auth.signOut(); location.reload(); };
+sb.auth.onAuthStateChange((ev) => { if (ev === "SIGNED_IN" && !ME) { $("login").classList.add("hidden"); boot(); } });
+
+// ---------- tabs ----------
+document.querySelectorAll("#tabs button").forEach((b) => b.onclick = () => show(b.dataset.tab));
+function show(tab) {
+  document.querySelectorAll("#tabs button").forEach((b) => b.classList.toggle("on", b.dataset.tab === tab));
+  for (const t of ["cases", "new", "admin"]) $("v-" + t).classList.toggle("hidden", t !== tab);
+  ({ cases: loadCases, new: loadNew, admin: loadAdmin })[tab]();
+}
+
+// ---------- case list ----------
+$("reload").onclick = loadCases; $("openOnly").onchange = loadCases;
+async function loadCases() {
+  await act(null, async () => {
+    const { cases } = await api("staff.list", { open_only: $("openOnly").checked });
+    const td = new Date().toLocaleDateString("en-CA");
+    $("caseRows").innerHTML = cases.map((c) => {
+      const [step, cls] = STEP[c.workflow] || [c.workflow, "muted"];
+      const late = !c.everify_case_number && c.everify_due && td > c.everify_due;
+      return `<tr class="click" data-id="${c.id}"><td><b>${esc(c.last_name || "")}${c.last_name ? ", " : ""}${esc(c.first_name || "")}</b><div class="muted">${esc(c.everify_case_number || c.employee_email)}</div></td><td class="hide-sm">${esc(c.client?.name)}</td><td>${esc(c.date_of_hire || "—")}${c.everify_due && !c.everify_case_number ? `<div class="${late ? "err" : "muted"}">E-Verify by ${c.everify_due}</div>` : ""}</td><td><span class="pill ${cls}">${step}</span></td><td>${statusPill(c)}</td></tr>`;
+    }).join("") || `<tr><td colspan="5" class="muted">No cases.</td></tr>`;
+    document.querySelectorAll("#caseRows tr[data-id]").forEach((tr) => tr.onclick = () => openCase(tr.dataset.id));
+  });
+}
+
+async function openCase(id) {
+  await act(null, async () => {
+    const { case: c, events } = await api("staff.get", { id });
+    CURRENT = c; renderCase(c, events); $("detail").scrollIntoView({ behavior: "smooth" });
+  });
+}
+async function refreshCurrent(c) { CURRENT = c; const { events } = await api("staff.get", { id: c.id }); renderCase(c, events); loadCases(); }
+
+// ---------- case detail ----------
+function renderCase(c, events = []) {
+  const p = c.pii || {};
+  const cit = { US_CITIZEN: "U.S. citizen", NONCITIZEN: "Noncitizen national", LAWFUL_PERMANENT_RESIDENT: "Lawful permanent resident", NONCITIZEN_AUTHORIZED_TO_WORK: "Noncitizen authorized to work", ALIEN_AUTHORIZED_TO_WORK: "Alien authorized to work" }[c.citizenship_status_code] || "—";
+  $("detail").innerHTML = `
+  <div class="card">
+    <div class="row" style="margin:0"><h2 style="flex:1;margin:0">${esc(c.first_name || "")} ${esc(c.last_name || "")}</h2>${statusPill(c)}</div>
+    ${c.last_error ? `<div class="banner bad" style="margin-top:12px">Last E-Verify error (${esc(c.last_error.action)}): ${esc((c.last_error.errors || []).map((e) => e.message).join("; "))}</div>` : ""}
+    <h3>Section 1</h3>
+    ${c.section1_signed_at ? `<dl class="kv">
+      <dt>Name</dt><dd>${esc(c.last_name)}, ${esc(c.first_name)} ${esc(c.middle_initial || "")}${c.other_last_names?.length ? ` (other: ${esc(c.other_last_names.join(", "))})` : ""}</dd>
+      <dt>Date of birth</dt><dd>${esc(c.date_of_birth)}</dd><dt>SSN</dt><dd>${esc(c.ssn_masked)}</dd>
+      <dt>Status</dt><dd>${cit}${c.work_auth_expires ? ` · work authorization expires ${esc(c.work_auth_expires)}` : ""}</dd>
+      ${p.alien_number ? `<dt>A-Number</dt><dd>${esc(p.alien_number)}</dd>` : ""}${p.i94_number ? `<dt>I-94</dt><dd>${esc(p.i94_number)}</dd>` : ""}
+      ${p.foreign_passport_number ? `<dt>Foreign passport</dt><dd>${esc(p.foreign_passport_number)} (${esc(p.country_code)})</dd>` : ""}
+      <dt>Address</dt><dd>${esc(c.address_line)} ${esc(c.apt || "")}, ${esc(c.city)}, ${esc(c.state)} ${esc(c.zip)}</dd>
+      <dt>Signed</dt><dd>${esc(c.section1_signature)} · ${new Date(c.section1_signed_at).toLocaleString()}</dd></dl>`
+    : `<p class="muted">Waiting for the employee (${esc(c.employee_email)}).</p><div class="row"><button class="danger" id="voidBtn">Void this invite</button></div>`}
+    <div id="sec2"></div><div id="actions"></div>
+    <h3>History</h3>
+    <table><tbody>${events.map((e) => `<tr><td class="muted" style="white-space:nowrap">${new Date(e.created_at).toLocaleString()}</td><td>${esc(e.action)}</td><td>${esc(e.case_status || "")}${e.http_status && e.http_status >= 400 ? ` <span class="pill bad">HTTP ${e.http_status}</span>` : ""}</td></tr>`).join("")}</tbody></table>
+  </div>`;
+  if ($("voidBtn")) $("voidBtn").onclick = () => confirm("Void this invite? The link will stop working.") && act($("voidBtn"), async () => { await api("staff.void", { id: c.id }); $("detail").innerHTML = ""; loadCases(); });
+  if (["section1_complete", "section2_complete"].includes(c.workflow) && !c.everify_case_number) renderSection2(c);
+  else if (c.section2_attested_at) $("sec2").innerHTML = `<h3>Section 2</h3><dl class="kv"><dt>Hire date</dt><dd>${esc(c.date_of_hire)}</dd><dt>Documents</dt><dd>${esc([c.document_a_type_code, c.document_b_type_code, c.document_c_type_code].filter(Boolean).join(" + "))}</dd><dt>Attested</dt><dd>${esc(c.case_creator_name)} · ${new Date(c.section2_attested_at).toLocaleString()}</dd><dt>E-Verify case #</dt><dd>${esc(c.everify_case_number || "—")}</dd></dl>`;
+  if (c.everify_case_number || c.workflow === "section2_complete") renderActions(c);
+}
+
+// ---------- Section 2 ----------
+const SEC2 = { us_passport_number: "U.S. passport number", i551_number: "Form I-551 card number", i766_number: "Form I-766 card number", document_bc_number: "Document number", visa_number: "Visa number", sevis_number: "SEVIS number", foreign_passport_number: "Foreign passport number", country_code: "Country of issuance", alien_number: "A-Number / USCIS number", i94_number: "Form I-94 number", document_sub_type_code: "Document sub-type", us_state_code: "Issuing state", expiration_date: "Expiration date", no_expiration_date: "No expiration date" };
+
+async function renderSection2(c) {
+  const listBC = !!c.document_b_type_code;
+  $("sec2").innerHTML = `<h3>Section 2 — Employer review and verification</h3>
+    <p class="muted">Physically examine the employee's original, unexpired document(s) — one from List A, or one from List B and one from List C. The employee chooses which acceptable documents to present.</p>
+    <div class="grid"><div><label for="hire">Employee's first day of employment</label><input id="hire" data-f="date_of_hire" type="date" value="${esc(c.date_of_hire || "")}"></div>
+    <div><label for="ecid">Your internal ID (optional)</label><input id="ecid" data-f="employer_case_id" maxlength="40" value="${esc(c.employer_case_id || "")}"></div></div>
+    <div id="delay"></div>
+    <label class="check"><input type="radio" name="lst" value="A" ${listBC ? "" : "checked"}>List A document</label>
+    <label class="check"><input type="radio" name="lst" value="BC" ${listBC ? "checked" : ""}>List B + List C documents</label>
+    <div id="docSel"></div><div id="docFields"></div>
+    <p class="legal">I attest, under penalty of perjury, that (1) I have examined the documentation presented by the above-named employee, (2) the above-listed documentation appears to be genuine and to relate to the employee named, and (3) to the best of my knowledge, the employee is authorized to work in the United States.</p>
+    <label class="check"><input type="checkbox" id="att" data-f="attest">I attest to the statement above. Signed: ${esc(ME.staff.full_name)}</label>
+    <div class="row"><button id="s2save">Save Section 2</button></div>`;
+  const cs = c.citizenship_status_code;
+  const drawSel = async () => {
+    const bc = document.querySelector("input[name=lst]:checked").value === "BC";
+    const cats = bc ? [["LIST_B", "doc_b", c.document_b_type_code], ["LIST_C", "doc_c", c.document_c_type_code]] : [["LIST_A", "doc_a", c.document_a_type_code]];
+    const html = [];
+    for (const [cat, id, sel] of cats) html.push(`<div><label for="${id}">${cat.replace("_", " ")} document</label><select id="${id}" data-f="${id === "doc_a" ? "document_a_type_code" : id === "doc_b" ? "document_b_type_code" : "document_c_type_code"}">${opts(await ref("document_types", { citizenship_status_code: cs, document_category: cat }), sel)}</select></div>`);
+    $("docSel").innerHTML = `<div class="grid">${html.join("")}</div>`;
+    document.querySelectorAll("#docSel select").forEach((s) => s.onchange = drawFields);
+    drawFields();
+  };
+  const drawFields = async () => {
+    const d = { document_a_type_code: $("doc_a")?.value || "", document_b_type_code: $("doc_b")?.value || "", document_c_type_code: $("doc_c")?.value || "" };
+    if (!(d.document_a_type_code || (d.document_b_type_code && d.document_c_type_code))) { $("docFields").innerHTML = ""; return; }
+    $("docFields").innerHTML = '<p class="muted">Checking which fields E-Verify needs…</p>';
+    await act(null, async () => {
+      const { fields } = await api("staff.case_fields", { id: c.id, ...d });
+      const p = c.pii || {}, out = [];
+      for (const f of fields) {
+        if (!(f.field_name in SEC2)) continue;
+        const k = f.field_name, lab = SEC2[k] + (f.required && k !== "no_expiration_date" ? " *" : ""), val = k === "expiration_date" ? c.expiration_date : p[k];
+        if (k === "no_expiration_date") out.push(`<div><label>&nbsp;</label><label class="check"><input type="checkbox" id="f_${k}" data-f="${k}" ${c.no_expiration_date ? "checked" : ""}>${SEC2[k]}</label></div>`);
+        else if (k === "expiration_date") out.push(`<div><label for="f_${k}">${lab}</label><input type="date" id="f_${k}" data-f="${k}" value="${esc(val || "")}"></div>`);
+        else if (k === "document_sub_type_code") out.push(`<div><label for="f_${k}">${lab}</label><select id="f_${k}" data-f="${k}">${opts(await ref("document_sub_types", { document_type_code: d.document_b_type_code || d.document_a_type_code }), c.document_sub_type_code)}</select></div>`);
+        else if (k === "us_state_code") out.push(`<div><label for="f_${k}">${lab}</label><select id="f_${k}" data-f="${k}">${opts(await ref("states"), c.us_state_code)}</select></div>`);
+        else if (k === "country_code") out.push(`<div><label for="f_${k}">${lab}</label><select id="f_${k}" data-f="${k}">${opts(await ref("countries"), p.country_code)}</select></div>`);
+        else out.push(`<div><label for="f_${k}">${lab}</label><input id="f_${k}" data-f="${k}" value="${esc(val || "")}" autocomplete="off"></div>`);
+      }
+      $("docFields").innerHTML = out.length ? `<div class="grid">${out.join("")}</div>` : "";
+    });
+  };
+  const drawDelay = async () => {
+    const h = $("hire").value; if (!h) { $("delay").innerHTML = ""; return; }
+    let d = new Date(h + "T12:00:00"), n = 3; while (n) { d.setDate(d.getDate() + 1); if (d.getDay() % 6) n--; }
+    const due = d.toLocaleDateString("en-CA"), late = new Date().toLocaleDateString("en-CA") > due;
+    $("delay").innerHTML = late ? `<div class="banner warn">The E-Verify deadline (${due}) has passed — choose a reason for the delay.</div><div class="grid"><div><label for="rfd">Reason for delay</label><select id="rfd" data-f="reason_for_delay_code">${opts(await ref("reasons_for_delay"), c.reason_for_delay_code)}</select></div><div><label for="rfdd">Explain (if Other)</label><input id="rfdd" data-f="reason_for_delay_description" maxlength="240" value="${esc(c.reason_for_delay_description || "")}"></div></div>` : `<p class="muted">Create the E-Verify case by ${due} (3 business days after hire).</p>`;
+  };
+  document.querySelectorAll("input[name=lst]").forEach((r) => r.onchange = drawSel);
+  $("hire").onchange = drawDelay;
+  drawSel(); drawDelay();
+  $("s2save").onclick = () => act($("s2save"), async () => {
+    const v = (id) => $(id)?.value?.trim() ?? "";
+    const pii = {}; for (const k of Object.keys(SEC2)) if ($("f_" + k) && !["document_sub_type_code", "us_state_code", "expiration_date", "no_expiration_date"].includes(k)) pii[k] = v("f_" + k);
+    const section2 = {
+      date_of_hire: v("hire"), employer_case_id: v("ecid"), document_a_type_code: v("doc_a"), document_b_type_code: v("doc_b"), document_c_type_code: v("doc_c"),
+      document_sub_type_code: v("f_document_sub_type_code"), us_state_code: v("f_us_state_code"), expiration_date: v("f_expiration_date"),
+      no_expiration_date: !!$("f_no_expiration_date")?.checked, reason_for_delay_code: v("rfd"), reason_for_delay_description: v("rfdd"),
+      attest: $("att").checked, pii,
+    };
+    await api("staff.section2", { id: c.id, section2 });
+    const { case: fresh } = await api("staff.get", { id: c.id }); await refreshCurrent(fresh);
+    flash("ok", "Section 2 saved. Review, then submit to E-Verify.");
+  });
+}
+
+// ---------- status-driven actions ----------
+function renderActions(c) {
+  const s = c.case_status, el = $("actions");
+  const box = (title, body) => `<h3>${title}</h3>${body}`;
+  const closeUi = `<div id="closeBox"></div>`;
+  let html = "";
+  if (!c.everify_case_number || s === "DRAFT") html = box("Submit to E-Verify", `<p class="muted">This runs a duplicate check, creates the case, and submits it for verification.</p><div class="row"><button id="submitBtn">Submit to E-Verify</button></div><div id="dupBox"></div>`);
+  else if (s === "UNCONFIRMED_DATA") html = box("Confirm case data", `<p class="muted">E-Verify asks you to confirm these values against the employee's Form I-9. Every field needs a value, even if unchanged.</p><div id="cdf"></div><div class="row"><button id="cdBtn">Confirm and continue</button></div>`) + closeUi;
+  else if (s === "PHOTO_MATCH") html = box("Photo match", `<p class="muted">Compare this photo to the photo on the employee's document. Do not compare it to the employee's face.</p><div id="photo" class="muted">Loading photo…</div><div class="row"><button data-pm="matching">Photo matches</button><button class="secondary" data-pm="not-matching">Does not match</button><button class="secondary" data-pm="no-image">No photo displayed</button></div>`) + closeUi;
+  else if (s === "SCAN_AND_UPLOAD") html = box("Scan and upload", `<p class="muted">Upload the front and back of the employee's document (PDF, PNG or JPEG, under 5MB each).</p><div class="grid"><div><label for="front">Front (with photo)</label><input type="file" id="front" accept=".pdf,.png,.jpg,.jpeg"></div><div><label for="back">Back (with barcode)</label><input type="file" id="back" accept=".pdf,.png,.jpg,.jpeg"></div></div><div class="row"><button id="upBtn">Upload</button></div>`) + closeUi;
+  else if (s === "PENDING_REFERRAL") html = box("Tentative nonconfirmation (mismatch)", `<div class="banner warn">Notify the employee privately and promptly. Do not take any adverse action (firing, suspending, delaying training, or cutting hours or pay) while the case is unresolved.</div>
+      <ol class="muted"><li>Download the Further Action Notice and review it with the employee in private.</li><li>Have the employee sign it, and keep it with the Form I-9.</li><li>The employee decides whether to take action (refer) or not take action.</li></ol>
+      <div class="row"><button class="secondary" data-fan="english">Further Action Notice (English)</button><button class="secondary" data-fan="spanish">Further Action Notice (Spanish)</button></div>
+      <label class="check"><input type="checkbox" id="notified">I privately notified the employee of the mismatch and gave them the Further Action Notice.</label>
+      <div class="row"><button id="referBtn" ${c.fan_downloaded_at ? "" : "disabled"}>Employee will take action — Refer</button><button class="danger" id="noActBtn">Employee chose not to take action</button></div>
+      ${c.fan_downloaded_at ? "" : '<p class="muted">Download the Further Action Notice first to enable referral.</p>'}`) + closeUi;
+  else if (s === "REFERRED") html = box("Referred to SSA/DHS", `<p class="muted">Give the employee the Referral Date Confirmation. The employee has 8 federal government working days to contact the agency. Updates arrive automatically.</p><div class="row"><button class="secondary" data-rdc="english">Referral Date Confirmation (English)</button><button class="secondary" data-rdc="spanish">(Spanish)</button><button class="secondary" id="refBtn">Check status now</button></div>`);
+  else if (["QUEUED", "MANUAL_REVIEW"].includes(s)) html = box("In process", `<p class="muted">${s === "MANUAL_REVIEW" ? "DHS is reviewing this case." : "E-Verify is still processing."} No action is needed. Updates arrive automatically.</p><div class="row"><button class="secondary" id="refBtn">Check status now</button></div>`);
+  else if (["EMPLOYMENT_AUTHORIZED", "FINAL_NONCONFIRMATION", "CLOSE_CASE_AND_RESUBMIT"].includes(s)) html = box(s === "EMPLOYMENT_AUTHORIZED" ? "Employment authorized — close the case" : s === "FINAL_NONCONFIRMATION" ? "Final nonconfirmation — close the case" : "Close and resubmit", s === "CLOSE_CASE_AND_RESUBMIT" ? '<p class="muted">E-Verify requires this case to be closed. Afterwards, start a new I-9 record for this employee.</p>' : "") + closeUi.replace("closeBox", "closeBoxOpen");
+  else if (s === "CLOSED") html = box("Case closed", `<p>${c.eligibility_statement === "EMPLOYMENT_AUTHORIZED" ? '<span class="pill ok">Employment authorized</span> Record the case number on the Form I-9 or keep this record with it.' : esc(c.eligibility_statement || "")}</p>`);
+  el.innerHTML = html;
+
+  // wiring
+  const done = async (r) => { await refreshCurrent(r.case); flash("ok", `E-Verify: ${r.case.case_status_display || r.case.case_status}`); };
+  if ($("submitBtn")) $("submitBtn").onclick = () => act($("submitBtn"), async () => { const r = await api("staff.submit", { id: c.id }); if (r.needs_duplicate_decision) return showDuplicates(c, r); await done(r); });
+  if ($("refBtn")) $("refBtn").onclick = () => act($("refBtn"), async () => done(await api("staff.refresh", { id: c.id })));
+  if (s === "UNCONFIRMED_DATA") act(null, async () => {
+    const { fields } = await api("staff.confirm_details_fields", { id: c.id });
+    $("cdf").innerHTML = `<div class="grid">${fields.map((f) => `<div><label>${esc(f.field_name.replaceAll("_", " "))}</label><input data-cd="${esc(f.field_name)}" value="${esc(f.value)}" ${f.field_name === "ssn" ? 'placeholder="Re-enter full SSN"' : ""}></div>`).join("")}</div>`;
+    $("cdBtn").onclick = () => act($("cdBtn"), async () => done(await api("staff.confirm_details", { id: c.id, fields: [...document.querySelectorAll("[data-cd]")].map((i) => ({ field_name: i.dataset.cd, value: i.value.trim() })) })));
+  });
+  if (s === "PHOTO_MATCH") act(null, async () => { const { photo } = await api("staff.photo", { id: c.id }); $("photo").innerHTML = `<img class="photo" alt="Document photo from E-Verify" src="data:image/jpeg;base64,${photo}">`; });
+  document.querySelectorAll("[data-pm]").forEach((b) => b.onclick = () => act(b, async () => done(await api("staff.photo_match", { id: c.id, result: b.dataset.pm }))));
+  if ($("upBtn")) $("upBtn").onclick = () => act($("upBtn"), async () => {
+    const read = (f) => new Promise((ok, no) => { if (!f) return no({ error: "Choose both files." }); const r = new FileReader(); r.onload = () => ok({ name: f.name, type: f.type === "image/jpg" ? "image/jpeg" : f.type, data: r.result.split(",")[1] }); r.readAsDataURL(f); });
+    done(await api("staff.scan_upload", { id: c.id, front: await read($("front").files[0]), back: await read($("back").files[0]) }));
+  });
+  const dl = (kind, language, btn) => act(btn, async () => {
+    const r = await api("staff.fan", { id: c.id, kind, language });
+    const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([Uint8Array.from(atob(r.pdf), (ch) => ch.charCodeAt(0))], { type: "application/pdf" })); a.download = r.filename; a.click();
+    if (kind === "further_action_notice") { CURRENT.fan_downloaded_at = new Date().toISOString(); if ($("referBtn")) $("referBtn").disabled = false; }
+  });
+  document.querySelectorAll("[data-fan]").forEach((b) => b.onclick = () => dl("further_action_notice", b.dataset.fan, b));
+  document.querySelectorAll("[data-rdc]").forEach((b) => b.onclick = () => dl("referral_date_confirmation", b.dataset.rdc, b));
+  if ($("referBtn")) $("referBtn").onclick = () => act($("referBtn"), async () => done(await api("staff.refer", { id: c.id, employee_notified: $("notified").checked })));
+  if ($("noActBtn")) $("noActBtn").onclick = () => confirm("Confirm the employee chose NOT to take action. This results in a Final Nonconfirmation.") && act($("noActBtn"), async () => done(await api("staff.no_action", { id: c.id, employee_notified: $("notified").checked })));
+  if ($("closeBox")) $("closeBox").innerHTML = `<details style="margin-top:14px"><summary class="muted">Close this case instead…</summary><div id="closeInner"></div></details>`, $("closeBox").querySelector("details").ontoggle = (e) => e.target.open && closeForm(c, $("closeInner"));
+  if ($("closeBoxOpen")) closeForm(c, $("closeBoxOpen"));
+}
+
+async function closeForm(c, mount, caseNumber) {
+  await act(null, async () => {
+    const { items } = await api("staff.closure_reasons", caseNumber ? { case_number: caseNumber } : { id: c.id });
+    mount.innerHTML = `<label>Closure reason</label><select id="cr">${opts(items, "")}</select>
+      <div id="crOther" class="hidden"><label>Describe the reason</label><input id="crOtherT" maxlength="256"></div>
+      <div id="crFnc" class="hidden"><label>Why will the employee continue to work?</label><input id="crFncT" maxlength="256"></div>
+      <div class="row"><button class="danger" id="crGo">Close case</button></div>`;
+    $("cr").onchange = () => { $("crOther").classList.toggle("hidden", $("cr").value !== "OTHER"); $("crFnc").classList.toggle("hidden", $("cr").value !== "EMPLOYEE_CONTINUES_TO_WORK_AFTER_FNC"); };
+    $("crGo").onclick = () => act($("crGo"), async () => {
+      const body = { case_closure_reason_code: $("cr").value, other_reason_description: $("crOtherT").value, currently_employed_reason_description: $("crFncT").value };
+      if (caseNumber) { await api("staff.close", { case_number: caseNumber, ...body }); mount.innerHTML = '<span class="pill muted">Closed</span>'; return; }
+      const r = await api("staff.close", { id: c.id, ...body }); await refreshCurrent(r.case); flash("ok", "Case closed.");
+    });
+  });
+}
+
+async function showDuplicates(c, r) {
+  const reasons = await ref("duplicate_continue_reasons");
+  $("dupBox").innerHTML = `<div class="banner warn" style="margin-top:12px">E-Verify found ${r.duplicates.length} case(s) for this SSN in the last 365 days. Continue an existing case, or close every open one and create a new case with a reason.</div>
+    <table><thead><tr><th>Case #</th><th>Name</th><th>Status</th><th></th></tr></thead><tbody>${r.duplicates.map((d, i) => `<tr><td>${esc(d.case_number)}</td><td>${esc(d.first_name)} ${esc(d.last_name)}<div class="muted">${esc(d.created_date || "")}</div></td><td>${esc(d.case_status_display || d.case_status)}</td><td>${d.case_status === "CLOSED" ? "" : `<button class="secondary" data-adopt="${esc(d.case_number)}">Continue this case</button> <button class="secondary" data-close="${i}">Close…</button><div id="dclose${i}"></div>`}</td></tr>`).join("")}</tbody></table>
+    <label for="dupR">Reason to create a new case</label><select id="dupR">${opts(reasons, "")}</select>
+    <div class="row"><button id="dupGo">Create new case</button></div>`;
+  document.querySelectorAll("[data-adopt]").forEach((b) => b.onclick = () => act(b, async () => { const x = await api("staff.adopt_case", { id: c.id, case_number: b.dataset.adopt }); await refreshCurrent(x.case); }));
+  document.querySelectorAll("[data-close]").forEach((b) => b.onclick = () => closeForm(c, $("dclose" + b.dataset.close), r.duplicates[b.dataset.close].case_number));
+  $("dupGo").onclick = () => act($("dupGo"), async () => {
+    const x = await api("staff.submit", { id: c.id, duplicate_continue_reason_code: $("dupR").value });
+    if (x.needs_duplicate_decision) throw { error: "Choose a reason." };
+    await refreshCurrent(x.case); flash("ok", `E-Verify: ${x.case.case_status_display || x.case.case_status}`);
+  });
+}
+
+// ---------- new hire ----------
+async function loadNew() {
+  await act(null, async () => { const { clients } = await api("staff.clients"); $("nClient").innerHTML = clients.map((c) => `<option value="${c.id}">${esc(c.name)}</option>`).join("") || '<option value="">Add a client company in Admin first</option>'; });
+}
+$("nGo").onclick = () => act($("nGo"), async () => {
+  const r = await api("staff.invite", { client_id: $("nClient").value, first_name: $("nFirst").value.trim(), last_name: $("nLast").value.trim(), employee_email: $("nEmail").value.trim(), date_of_hire: $("nHire").value, send_email: $("nSend").checked });
+  $("nOut").innerHTML = `<div class="banner ok" style="margin-top:12px">${r.emailed ? "Link emailed to the employee." : "Copy this private link to the employee:"}<br><input readonly value="${esc(r.link)}" onclick="this.select()"></div>`;
+  for (const id of ["nFirst", "nLast", "nEmail", "nHire"]) $(id).value = "";
+});
+
+// ---------- admin ----------
+async function loadAdmin() {
+  await act(null, async () => {
+    const [{ clients }, { staff }] = await Promise.all([api("staff.clients"), api("admin.staff_list")]);
+    $("clientRows").innerHTML = clients.map((c) => `<tr><td>${esc(c.name)}</td><td>${esc(c.client_company_id)}</td><td>${esc(c.notify_email || "—")}</td></tr>`).join("");
+    $("staffRows").innerHTML = staff.map((s) => `<tr class="click" data-s='${esc(JSON.stringify(s))}'><td>${esc(s.full_name)}${s.active ? "" : ' <span class="pill muted">inactive</span>'}</td><td>${esc(s.email)}</td><td>${s.training_passed_at ? `<span class="pill ok">Passed ${esc(s.training_score)}%</span>` : '<span class="pill warn">Not recorded</span>'}</td><td>${s.is_admin ? "Admin" : "User"}</td></tr>`).join("");
+    document.querySelectorAll("#staffRows tr").forEach((tr) => tr.onclick = () => { const s = JSON.parse(tr.dataset.s); $("sName").value = s.full_name; $("sEmail").value = s.email; $("sPhone").value = s.phone; $("sExt").value = s.phone_ext || ""; $("sScore").value = s.training_score ?? ""; $("sAdmin").checked = s.is_admin; $("sActive").checked = s.active; });
+  });
+}
+$("cGo").onclick = () => act($("cGo"), async () => { await api("admin.client_upsert", { name: $("cName").value.trim(), client_company_id: $("cId").value.trim(), notify_email: $("cNotify").value.trim() }); for (const i of ["cName", "cId", "cNotify"]) $(i).value = ""; loadAdmin(); });
+$("sGo").onclick = () => act($("sGo"), async () => { await api("admin.staff_upsert", { full_name: $("sName").value.trim(), email: $("sEmail").value.trim(), phone: $("sPhone").value, phone_ext: $("sExt").value, training_score: $("sScore").value, is_admin: $("sAdmin").checked, active: $("sActive").checked }); flash("ok", "User saved. New users receive an invitation email."); loadAdmin(); });
+
+boot();
+</script>
+</body></html>

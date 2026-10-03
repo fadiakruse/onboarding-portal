@@ -35,7 +35,8 @@ export async function updateSession(request: NextRequest) {
     path === '/confirm-login' ||
     path.startsWith('/auth') ||
     path === '/api/track-invite' ||
-    path === '/api/request-login-link';
+    path === '/api/request-login-link' ||
+    path.startsWith('/everify/'); // E-Verify pages authenticate via the everify edge function
 
   if (!user && !isPublicPath) {
     const url = request.nextUrl.clone();
