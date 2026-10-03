@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Form I-9 Section 1</title><link rel="stylesheet" href="styles.css"><script src="config.js"></script></head>
+<body>
+<header><h1 id="org">Form I-9 — Section 1: Employee Information and Attestation</h1></header>
+<main style="max-width:760px">
+  <div id="msg"></div>
+  <form id="f" class="card hidden" novalidate>
+    <p class="muted">Complete this section no later than your first day of employment. Your employer participates in E-Verify and will use this information to confirm your employment eligibility with the Social Security Administration and the Department of Homeland Security. Your information is encrypted.</p>
+    <h3>Your name</h3>
+    <div class="grid">
+      <div><label for="last_name">Last name (family name)</label><input id="last_name" maxlength="40" autocomplete="family-name"></div>
+      <div><label for="first_name">First name (given name)</label><input id="first_name" maxlength="25" autocomplete="given-name"></div>
+      <div><label for="middle_initial">Middle initial</label><input id="middle_initial" maxlength="1"></div>
+    </div>
+    <label for="other_last_names">Other last names used (if any, separate with commas)</label><input id="other_last_names">
+    <h3>Address</h3>
+    <label for="address_line">Street number and name</label><input id="address_line" autocomplete="address-line1">
+    <div class="grid">
+      <div><label for="apt">Apt. number</label><input id="apt"></div>
+      <div><label for="city">City or town</label><input id="city" autocomplete="address-level2"></div>
+      <div><label for="state">State</label><input id="state" maxlength="2" autocomplete="address-level1"></div>
+      <div><label for="zip">ZIP code</label><input id="zip" maxlength="10" autocomplete="postal-code"></div>
+    </div>
+    <h3>Personal details</h3>
+    <div class="grid">
+      <div><label for="date_of_birth">Date of birth</label><input id="date_of_birth" type="date"></div>
+      <div><label for="ssn">U.S. Social Security number</label><input id="ssn" inputmode="numeric" autocomplete="off" placeholder="123-45-6789"></div>
+      <div><label for="email">Email address</label><input id="email" readonly></div>
+      <div><label for="phone">Telephone number</label><input id="phone" inputmode="tel" autocomplete="tel"></div>
+    </div>
+    <p class="muted">E-Verify employers must have the employee's Social Security number. If you have applied for one but haven't received it yet, tell your employer before submitting.</p>
+    <h3>Citizenship or immigration status — check one</h3>
+    <div id="citizenship_status_code">
+      <label class="check"><input type="radio" name="cit" value="US_CITIZEN">1. A citizen of the United States</label>
+      <label class="check"><input type="radio" name="cit" value="NONCITIZEN">2. A noncitizen national of the United States</label>
+      <label class="check"><input type="radio" name="cit" value="LAWFUL_PERMANENT_RESIDENT">3. A lawful permanent resident</label>
+      <label class="check"><input type="radio" name="cit" value="NONCITIZEN_AUTHORIZED_TO_WORK">4. A noncitizen (other than item 2 and 3 above) authorized to work</label>
+    </div>
+    <div id="lpr" class="hidden"><label for="alien_number">USCIS number / A-Number</label><input id="alien_number" placeholder="A123456789"></div>
+    <div id="naw" class="hidden">
+      <label for="work_auth_expires">Work authorization expiration date (leave blank if N/A)</label><input id="work_auth_expires" type="date">
+      <p class="muted">Provide ONE of the following:</p>
+      <div class="grid">
+        <div><label for="alien_number2">USCIS number / A-Number</label><input id="alien_number2"></div>
+        <div><label for="i94_number">Form I-94 admission number</label><input id="i94_number" maxlength="11"></div>
+      </div>
+      <div class="grid">
+        <div><label for="foreign_passport_number">Foreign passport number</label><input id="foreign_passport_number" maxlength="12"></div>
+        <div><label for="country_code">Country of issuance (3-letter code, e.g. MEX)</label><input id="country_code" maxlength="3"></div>
+      </div>
+    </div>
+    <h3>Attestation</h3>
+    <p class="legal">I am aware that federal law provides for imprisonment and/or fines for false statements, or the use of false documents, in connection with the completion of this form. I attest, under penalty of perjury, that this information, including my selection of the box attesting to my citizenship or immigration status, is true and correct.</p>
+    <label class="check"><input type="checkbox" id="attest">I have read and agree to the statement above.</label>
+    <label for="signature">Signature — type your full legal name</label><input id="signature" autocomplete="name">
+    <p class="muted">Today's date will be recorded with your signature.</p>
+    <div class="row"><button id="go" type="submit">Sign and submit Section 1</button></div>
+  </form>
+</main>
+<script>
+const C = window.I9_CONFIG, t = new URLSearchParams(location.search).get("t");
+const $ = (id) => document.getElementById(id);
+const msg = (cls, text) => { $("msg").innerHTML = `<div class="banner ${cls}"></div>`; $("msg").firstChild.textContent = text; };
+async function api(action, body) {
+  const r = await fetch(C.FUNCTION_URL, { method: "POST", headers: { "Content-Type": "application/json", apikey: C.SUPABASE_ANON_KEY, Authorization: `Bearer ${C.SUPABASE_ANON_KEY}` }, body: JSON.stringify({ action, token: t, ...body }) });
+  const j = await r.json().catch(() => ({ error: "Network error" }));
+  if (!r.ok) throw j; return j;
+}
+document.querySelectorAll("input[name=cit]").forEach((r) => r.addEventListener("change", () => {
+  const v = document.querySelector("input[name=cit]:checked")?.value;
+  $("lpr").classList.toggle("hidden", v !== "LAWFUL_PERMANENT_RESIDENT");
+  $("naw").classList.toggle("hidden", v !== "NONCITIZEN_AUTHORIZED_TO_WORK");
+}));
+$("ssn").addEventListener("input", (e) => { const d = e.target.value.replace(/\D/g, "").slice(0, 9); e.target.value = d.length > 5 ? `${d.slice(0,3)}-${d.slice(3,5)}-${d.slice(5)}` : d.length > 3 ? `${d.slice(0,3)}-${d.slice(3)}` : d; });
+
+(async () => {
+  if (!t) return msg("bad", "This page needs the private link your employer emailed you.");
+  try {
+    const d = await api("employee.load");
+    $("email").value = d.employee_email; if (d.first_name) $("first_name").value = d.first_name;
+    if (d.client_name) $("org").textContent = `${d.client_name} — Form I-9 Section 1`;
+    $("f").classList.remove("hidden");
+  } catch (e) { msg("bad", e.error || "This link could not be opened."); }
+})();
+
+$("f").addEventListener("submit", async (ev) => {
+  ev.preventDefault();
+  document.querySelectorAll(".err").forEach((n) => n.remove());
+  const v = (id) => $(id).value.trim();
+  const cit = document.querySelector("input[name=cit]:checked")?.value;
+  const section1 = {
+    last_name: v("last_name"), first_name: v("first_name"), middle_initial: v("middle_initial"), other_last_names: v("other_last_names"),
+    address_line: v("address_line"), apt: v("apt"), city: v("city"), state: v("state").toUpperCase(), zip: v("zip"),
+    date_of_birth: v("date_of_birth"), ssn: v("ssn"), phone: v("phone"), citizenship_status_code: cit,
+    alien_number: cit === "LAWFUL_PERMANENT_RESIDENT" ? v("alien_number") : cit === "NONCITIZEN_AUTHORIZED_TO_WORK" ? v("alien_number2") : "",
+    i94_number: cit === "NONCITIZEN_AUTHORIZED_TO_WORK" ? v("i94_number") : "",
+    foreign_passport_number: cit === "NONCITIZEN_AUTHORIZED_TO_WORK" ? v("foreign_passport_number") : "",
+    country_code: cit === "NONCITIZEN_AUTHORIZED_TO_WORK" ? v("country_code").toUpperCase() : "",
+    work_auth_expires: cit === "NONCITIZEN_AUTHORIZED_TO_WORK" ? v("work_auth_expires") : "",
+    attest: $("attest").checked, signature: v("signature"),
+  };
+  $("go").disabled = true;
+  try {
+    await api("employee.submit", { section1 });
+    $("f").remove(); msg("ok", "Thank you — Section 1 is complete. Bring your original, unexpired identity and work-authorization documents of your choice from the Form I-9 Lists of Acceptable Documents on your first day.");
+    scrollTo(0, 0);
+  } catch (e) {
+    msg("bad", e.error || "Something went wrong.");
+    for (const [k, m] of Object.entries(e.fields || {})) {
+      const el = $(k === "alien_number" && cit === "NONCITIZEN_AUTHORIZED_TO_WORK" ? "alien_number2" : k) || $("citizenship_status_code");
+      const n = document.createElement("div"); n.className = "err"; n.textContent = m; el.after(n);
+    }
+    scrollTo(0, 0);
+  } finally { if ($("go")) $("go").disabled = false; }
+});
+</script>
+</body></html>
