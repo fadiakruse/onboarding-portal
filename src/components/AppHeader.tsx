@@ -37,7 +37,12 @@ export default function AppHeader({ practiceName, isManager }: AppHeaderProps) {
               </Link>
               <Link href="/admin/files" className="text-gray-500 hover:text-gray-800">
                 View Employee Files
-              </Link>            </>
+              </Link>
+              {/* Static page in public/everify — plain <a>, not next/link */}
+              <a href="/everify/employer.html" className="text-gray-500 hover:text-gray-800">
+                E-Verify
+              </a>
+            </>
           )}
           <button onClick={handleSignOut} className="text-gray-500 hover:text-gray-800">
             Sign out

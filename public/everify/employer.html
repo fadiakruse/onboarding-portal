@@ -1,7 +1,6 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>E-Verify Dashboard</title><link rel="stylesheet" href="styles.css"><script src="config.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script></head>
+<title>E-Verify Dashboard</title><link rel="stylesheet" href="styles.css"><script src="config.js"></script></head>
 <body>
 <header>
   <h1>E-Verify · Form I-9</h1>
@@ -9,15 +8,15 @@
   <nav class="tabs hidden" id="tabs">
     <button data-tab="cases" class="on">Cases</button><button data-tab="new">New hire</button><button data-tab="admin" id="tabAdmin" class="hidden">Admin</button>
   </nav>
-  <button class="secondary hidden" id="signout">Sign out</button>
+  <a class="btn secondary" href="/admin" style="background:transparent;color:var(--brand)">Back to portal</a>
 </header>
 <main>
   <div id="msg"></div>
 
   <section id="login" class="card hidden" style="max-width:420px">
     <h2>Sign in</h2>
-    <label for="loginEmail">Work email</label><input id="loginEmail" type="email" autocomplete="email">
-    <div class="row"><button id="loginBtn">Email me a sign-in link</button></div>
+    <p class="muted">E-Verify uses your onboarding portal sign-in. Sign in to the portal, then choose <b>E-Verify</b> in the menu.</p>
+    <div class="row"><a class="btn" href="/login">Go to portal sign-in</a></div>
   </section>
 
   <section id="v-cases" class="hidden">
@@ -69,9 +68,11 @@
     </div>
   </section>
 </main>
-<script>
+<script type="module">
+// Shares the onboarding portal's sign-in (cookie session from @supabase/ssr).
+import { createBrowserClient } from "https://cdn.jsdelivr.net/npm/@supabase/ssr@0.5/+esm";
 const C = window.I9_CONFIG;
-const sb = supabase.createClient(C.SUPABASE_URL, C.SUPABASE_ANON_KEY);
+const sb = createBrowserClient(C.SUPABASE_URL, C.SUPABASE_ANON_KEY);
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 let ME = null, CURRENT = null; const REF = {};
@@ -101,22 +102,15 @@ function statusPill(c) {
 async function boot() {
   const { data: { session } } = await sb.auth.getSession();
   if (!session) { $("login").classList.remove("hidden"); return; }
-  try { ME = await api("staff.me"); } catch (e) { flash("bad", e.error); $("signout").classList.remove("hidden"); return; }
+  try { ME = await api("staff.me"); } catch (e) { flash("bad", e.error); return; }
   $("mode").textContent = ME.mode.toUpperCase(); $("mode").className = "pill " + (ME.mode === "production" ? "ok" : "warn");
-  $("tabs").classList.remove("hidden"); $("signout").classList.remove("hidden");
+  $("tabs").classList.remove("hidden");
   if (ME.staff.is_admin) $("tabAdmin").classList.remove("hidden");
   if (!ME.staff.training_passed_at) flash("warn", "Your E-Verify training is not recorded yet. An administrator must enter your passing knowledge-test score before you can run cases.");
   else if (ME.password_expiration_date && (new Date(ME.password_expiration_date) - Date.now()) < 14 * 864e5) flash("warn", `The E-Verify web services password expires ${ME.password_expiration_date}. Update it in E-Verify and in the function secrets.`);
   else if (ME.mode === "mock") flash("info", "MOCK mode: nothing is sent to E-Verify. Last names containing photo / mismatch / confirm / queue / dupe simulate those outcomes.");
   show("cases");
 }
-$("loginBtn").onclick = () => act($("loginBtn"), async () => {
-  const { error } = await sb.auth.signInWithOtp({ email: $("loginEmail").value.trim(), options: { emailRedirectTo: location.href.split("#")[0], shouldCreateUser: false } });
-  if (error) throw { error: error.message }; flash("ok", "Check your email for the sign-in link.");
-});
-$("signout").onclick = async () => { await sb.auth.signOut(); location.reload(); };
-sb.auth.onAuthStateChange((ev) => { if (ev === "SIGNED_IN" && !ME) { $("login").classList.add("hidden"); boot(); } });
-
 // ---------- tabs ----------
 document.querySelectorAll("#tabs button").forEach((b) => b.onclick = () => show(b.dataset.tab));
 function show(tab) {

@@ -15,7 +15,7 @@ supabase/tests/everify/  Mock end-to-end tests + local preview server
 - E-Verify credentials and SSNs never reach a browser. The function holds the credentials, and SSNs and document numbers are encrypted at rest (AES-256-GCM). Staff see only the last 4 digits of the SSN.
 - Database tables have Row Level Security turned on with no policies. Only the function, using the service role, can read or write them.
 - Employee links are single-use, stored only as a hash, and expire after 14 days.
-- Staff sign in with a Supabase email sign-in link. They must be listed in `everify_staff`, and they must have a passing training score recorded before they can run cases. That score is the DHS 70% knowledge-test requirement.
+- Staff use their normal onboarding portal sign-in (the dashboard shares the portal session); the E-Verify link is in the manager menu. They must also be listed in `everify_staff` with a passing training score recorded before they can run cases. That score is the DHS 70% knowledge-test requirement.
 - Every E-Verify call is logged to `everify_events`. Error details are stored, but SSNs and document numbers are not.
 - Document photos from Photo Match are displayed but never stored.
 
@@ -24,8 +24,8 @@ supabase/tests/everify/  Mock end-to-end tests + local preview server
 **1. Test it in mock mode first. This needs no E-Verify credentials.**
 ```bash
 cd onboarding-portal
-PII_ENCRYPTION_KEY=$(openssl rand -base64 32) deno test -A supabase/tests/everify/          # 10 flow tests
-PII_ENCRYPTION_KEY=$(openssl rand -base64 32) deno run -A supabase/tests/everify/dev_server.ts
+PII_ENCRYPTION_KEY=$(openssl rand -base64 32) DENO_NO_PACKAGE_JSON=1 deno test -A --no-config supabase/tests/everify/          # 10 flow tests
+PII_ENCRYPTION_KEY=$(openssl rand -base64 32) DENO_NO_PACKAGE_JSON=1 deno run -A --no-config supabase/tests/everify/dev_server.ts
 # open http://localhost:8787/employer.html. A last name containing photo / mismatch / confirm / queue / dupe simulates that outcome.
 ```
 
@@ -52,7 +52,7 @@ supabase functions deploy everify --no-verify-jwt
 ```
 `--no-verify-jwt` is correct here. The function does its own authentication: invite tokens for employees, and staff JWT plus the staff table for employers.
 
-**5. Add yourself as the first administrator.** First, open `employer.html` and request a sign-in link once; that creates your account. Then run this in the SQL editor:
+**5. Add yourself as the first administrator.** Your portal account is your E-Verify account. Then run this in the SQL editor:
 ```sql
 insert into everify_staff (user_id, email, full_name, phone, is_admin, training_passed_at, training_score)
 select id, email, 'Your Name', '7325551234', true, now(), 100 from auth.users where email = 'you@yourdomain';
